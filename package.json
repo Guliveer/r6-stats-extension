@@ -1,7 +1,7 @@
 {
-  "name": "r6-tracker-plugin",
+  "name": "r6-stats-extension",
   "version": "1.0.0",
-  "description": "Chrome extension for quick R6 Siege stats from tracker.gg",
+  "description": "R6 Siege RP session tracker & quick links for tracker.gg",
   "type": "module",
   "scripts": {
     "dev": "vite",

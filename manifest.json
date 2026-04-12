@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "R6 Tracker Quick Stats",
+  "name": "R6 Stats Extension",
   "version": "1.0.0",
   "description": "RP session balance on tracker.gg + quick links to R6 trackers",
   "permissions": ["storage"],

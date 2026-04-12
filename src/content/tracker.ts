@@ -1,4 +1,4 @@
-// R6 Tracker Quick Stats — RP Session Balance injection
+// R6 Stats Extension — RP Session Balance injection
 // Injects daily RP balance badges into tracker.gg match history headers
 
 function waitForMatchRows(timeout = 8_000): Promise<boolean> {

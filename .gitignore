@@ -5,4 +5,7 @@ dist/
 .env
 .omc/
 .remember/
+.claude/
+CLAUDE.md
+public/icons/*.svg
 screenshot-*.png
