@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.png
+!public/icons/*.png
+.env
+.omc/
+.remember/
+screenshot-*.png

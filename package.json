@@ -1,0 +1,20 @@
+{
+  "name": "r6-tracker-plugin",
+  "version": "1.0.0",
+  "description": "Chrome extension for quick R6 Siege stats from tracker.gg",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/chrome": "^0.1.40",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vite-plugin-static-copy": "^4.0.1"
+  }
+}

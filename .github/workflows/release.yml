@@ -1,0 +1,57 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Generate PNG icons
+        run: node scripts/generate-icons.mjs
+
+      - name: Get version
+        id: version
+        run: echo "version=$(node --input-type=module -e 'import{readFileSync}from"fs";console.log(JSON.parse(readFileSync("package.json","utf8")).version)')" >> $GITHUB_OUTPUT
+
+      - name: Package extension
+        run: |
+          cd dist
+          zip -r ../r6-stats-extension-v${{ steps.version.outputs.version }}.zip .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-${{ github.run_number }}
+          name: R6 Stats Extension v${{ steps.version.outputs.version }} (build ${{ github.run_number }})
+          body: |
+            ## R6 Stats Extension
+
+            ### Installation
+            1. Download `r6-stats-extension-v${{ steps.version.outputs.version }}.zip` below
+            2. Unzip to a folder
+            3. Open `chrome://extensions/` in Chrome
+            4. Enable **Developer mode** (top right)
+            5. Click **Load unpacked** and select the unzipped folder
+
+            ### Features
+            - **RP Session Summary** — injected on tracker.gg match history pages
+            - **Daily RP badges** — per-day RP balance on match headers
+            - **Quick Links** — fast access to tracker.network and stats.cc
+            - **Auto-refresh** on "Load More"
+          files: r6-stats-extension-v${{ steps.version.outputs.version }}.zip
