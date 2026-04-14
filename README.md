@@ -15,6 +15,12 @@ Chrome extension for Rainbow Six Siege that injects **RP session balance** into 
 - Supports username, platform (PC/PSN/Xbox), and GUID configuration
 - Auto-fetches your avatar from tracker.gg
 
+## Screenshots
+
+| RP Session Summary (match history) | Compact overview widget |
+|---|---|
+| ![RP Session Summary banner showing daily RP balance](docs/screenshot-1.png) | ![Compact session summary with stats on overview page](docs/screenshot-2.png) |
+
 ## Installation
 
 ### From Release (recommended)
