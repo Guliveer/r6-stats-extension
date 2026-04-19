@@ -305,47 +305,12 @@ function injectStatsccProfileButton(): void {
   firstCard.before(link);
 }
 
-function injectStatsccPlayerIcons(): void {
-  const playerLinks = document.querySelectorAll<HTMLAnchorElement>('a.no-underline[href*="/r6siege/profile/"]');
-  for (const playerLink of playerLinks) {
-    const wrapper = playerLink.closest('.v3-stat-value');
-    if (!wrapper) continue;
-    if (wrapper.querySelector('.r6ext-statscc-link')) continue;
-
-    const match = playerLink.getAttribute('href')?.match(/\/r6siege\/profile\/(ubi|psn|xbl)\/([^/]+)/);
-    if (!match) continue;
-
-    const username = decodeURIComponent(match[2]);
-
-    const link = document.createElement('a');
-    link.href = `https://stats.cc/siege/${encodeURIComponent(username)}`;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.className = 'r6ext-statscc-link';
-    link.title = `${username} on Stats.cc`;
-    link.style.cssText = `
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0;
-      background: hsla(37,52%,69%,0.12); color: hsl(37,52%,69%);
-      font-size: 7px; font-weight: 800; line-height: 1;
-      text-decoration: none; cursor: pointer; transition: all 0.15s ease;
-    `;
-    link.onmouseenter = () => { link.style.background = 'hsla(37,52%,69%,0.3)'; };
-    link.onmouseleave = () => { link.style.background = 'hsla(37,52%,69%,0.12)'; };
-    link.textContent = 'SC';
-
-    link.addEventListener('click', (e) => e.stopPropagation());
-    wrapper.appendChild(link);
-  }
-}
-
 // --- Main ---
 
 async function main(): Promise<void> {
   const found = await waitForMatchRows();
   if (found) {
     injectRpBalances();
-    injectStatsccPlayerIcons();
   }
   extractAndSendAvatar();
   injectStatsccProfileButton();
@@ -358,7 +323,6 @@ const profileObserver = new MutationObserver(() => {
   if (!document.querySelector('.r6ext-statscc-profile')) {
     injectStatsccProfileButton();
   }
-  injectStatsccPlayerIcons();
 });
 const profileRoot = document.querySelector('.content, main, #app') ?? document.body;
 profileObserver.observe(profileRoot, { childList: true, subtree: true });
@@ -381,7 +345,7 @@ const loadMoreObserver = new MutationObserver(() => {
   if (currentCount > lastMatchCount) {
     lastMatchCount = currentCount;
     if (loadMoreDebounce) clearTimeout(loadMoreDebounce);
-    loadMoreDebounce = setTimeout(() => { injectRpBalances(); injectStatsccPlayerIcons(); }, 500);
+    loadMoreDebounce = setTimeout(() => injectRpBalances(), 500);
   }
 });
 
