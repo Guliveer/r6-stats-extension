@@ -10,3 +10,4 @@ CLAUDE.md
 public/icons/*.svg
 screenshot-*.png
 !docs/**
+.playwright-mcp/

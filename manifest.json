@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "R6 Stats Extension",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "RP session balance on tracker.gg + quick links to R6 trackers",
   "permissions": ["storage"],
   "host_permissions": [
     "https://r6.tracker.network/*",
-    "https://tracker.gg/r6siege/*"
+    "https://tracker.gg/r6siege/*",
+    "https://stats.cc/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",
@@ -27,6 +28,11 @@
         "https://tracker.gg/r6siege/profile/*"
       ],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://stats.cc/siege/*"],
+      "js": ["content-statscc.js"],
       "run_at": "document_idle"
     }
   ],

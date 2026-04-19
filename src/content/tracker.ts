@@ -239,15 +239,129 @@ function extractAndSendAvatar(): void {
   }
 }
 
+// --- Stats.cc profile link ---
+
+function extractUsernameFromUrl(): string | null {
+  const match = location.pathname.match(/\/r6siege\/profile\/(ubi|psn|xbl)\/([^/]+)/);
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function extractGuidFromPage(): string | null {
+  const imgs = document.querySelectorAll<HTMLImageElement>('img[src*="ubisoft-avatars"]');
+  for (const img of imgs) {
+    const match = img.src.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function injectStatsccProfileButton(): void {
+  if (document.querySelector('.r6ext-statscc-profile')) return;
+
+  const username = extractUsernameFromUrl();
+  if (!username) return;
+
+  const guid = extractGuidFromPage();
+  if (!guid) return;
+
+  const firstCard = document.querySelector('.v3-grid .v3-card');
+  if (!firstCard) return;
+
+  const link = document.createElement('a');
+  link.href = `https://stats.cc/siege/${encodeURIComponent(username)}/${guid}`;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.className = 'r6ext-statscc-profile';
+  link.title = `Open ${username} on Stats.cc`;
+  link.style.cssText = `
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 12px; margin-bottom: 6px; border-radius: 6px;
+    background: hsla(37,52%,69%,0.08); border: 1px solid hsla(37,52%,69%,0.2);
+    color: hsl(37,52%,69%); font-size: 13px; font-weight: 600;
+    text-decoration: none; cursor: pointer; transition: all 0.15s ease;
+  `;
+  link.onmouseenter = () => {
+    link.style.background = 'hsla(37,52%,69%,0.15)';
+    link.style.borderColor = 'hsla(37,52%,69%,0.4)';
+  };
+  link.onmouseleave = () => {
+    link.style.background = 'hsla(37,52%,69%,0.08)';
+    link.style.borderColor = 'hsla(37,52%,69%,0.2)';
+  };
+
+  const icon = document.createElement('span');
+  icon.textContent = 'SC';
+  icon.style.cssText = `
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px;
+    background: hsla(37,52%,69%,0.15); color: hsl(37,52%,69%);
+    font-size: 9px; font-weight: 800; line-height: 1;
+  `;
+
+  const label = document.createElement('span');
+  label.textContent = 'View on Stats.cc';
+
+  link.append(icon, label);
+  firstCard.before(link);
+}
+
+function injectStatsccPlayerIcons(): void {
+  const playerLinks = document.querySelectorAll<HTMLAnchorElement>('a.no-underline[href*="/r6siege/profile/"]');
+  for (const playerLink of playerLinks) {
+    const wrapper = playerLink.closest('.v3-stat-value');
+    if (!wrapper) continue;
+    if (wrapper.querySelector('.r6ext-statscc-link')) continue;
+
+    const match = playerLink.getAttribute('href')?.match(/\/r6siege\/profile\/(ubi|psn|xbl)\/([^/]+)/);
+    if (!match) continue;
+
+    const username = decodeURIComponent(match[2]);
+
+    const link = document.createElement('a');
+    link.href = `https://stats.cc/siege/${encodeURIComponent(username)}`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.className = 'r6ext-statscc-link';
+    link.title = `${username} on Stats.cc`;
+    link.style.cssText = `
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0;
+      background: hsla(37,52%,69%,0.12); color: hsl(37,52%,69%);
+      font-size: 7px; font-weight: 800; line-height: 1;
+      text-decoration: none; cursor: pointer; transition: all 0.15s ease;
+    `;
+    link.onmouseenter = () => { link.style.background = 'hsla(37,52%,69%,0.3)'; };
+    link.onmouseleave = () => { link.style.background = 'hsla(37,52%,69%,0.12)'; };
+    link.textContent = 'SC';
+
+    link.addEventListener('click', (e) => e.stopPropagation());
+    wrapper.appendChild(link);
+  }
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
   const found = await waitForMatchRows();
-  if (found) injectRpBalances();
+  if (found) {
+    injectRpBalances();
+    injectStatsccPlayerIcons();
+  }
   extractAndSendAvatar();
+  injectStatsccProfileButton();
 }
 
 main();
+
+// Profile button: inject as soon as header appears, don't wait for match rows
+const profileObserver = new MutationObserver(() => {
+  if (!document.querySelector('.r6ext-statscc-profile')) {
+    injectStatsccProfileButton();
+  }
+  injectStatsccPlayerIcons();
+});
+const profileRoot = document.querySelector('.content, main, #app') ?? document.body;
+profileObserver.observe(profileRoot, { childList: true, subtree: true });
 
 // SPA navigation: lightweight URL polling
 let lastPath = location.pathname;
@@ -267,7 +381,7 @@ const loadMoreObserver = new MutationObserver(() => {
   if (currentCount > lastMatchCount) {
     lastMatchCount = currentCount;
     if (loadMoreDebounce) clearTimeout(loadMoreDebounce);
-    loadMoreDebounce = setTimeout(() => injectRpBalances(), 500);
+    loadMoreDebounce = setTimeout(() => { injectRpBalances(); injectStatsccPlayerIcons(); }, 500);
   }
 });
 
