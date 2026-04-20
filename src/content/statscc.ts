@@ -76,6 +76,7 @@ function createPlayerTrackerIcon(username: string): HTMLAnchorElement {
   };
 
   link.textContent = 'TN';
+  link.addEventListener('click', (e) => e.stopPropagation());
   return link;
 }
 
