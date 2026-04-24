@@ -1,5 +1,5 @@
-// R6 Stats Extension — RP Session Balance injection
-// Injects daily RP balance badges into tracker.gg match history headers
+import { BRAND, GUID_RE, parseTrackerProfilePath } from '../lib/patterns';
+import { appendClonedTab, findInactiveTab } from './_shared';
 
 function waitForMatchRows(timeout = 8_000): Promise<boolean> {
   return new Promise((resolve) => {
@@ -241,68 +241,59 @@ function extractAndSendAvatar(): void {
 
 // --- Stats.cc profile link ---
 
-function extractUsernameFromUrl(): string | null {
-  const match = location.pathname.match(/\/r6siege\/profile\/(ubi|psn|xbl)\/([^/]+)/);
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
 function extractGuidFromPage(): string | null {
   const imgs = document.querySelectorAll<HTMLImageElement>('img[src*="ubisoft-avatars"]');
   for (const img of imgs) {
-    const match = img.src.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-    if (match) return match[1];
+    const match = GUID_RE.exec(img.src);
+    if (match) return match[0];
   }
   return null;
+}
+
+function findTrackerProfileNav(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('.v3-tabs');
 }
 
 function injectStatsccProfileButton(): void {
   if (document.querySelector('.r6ext-statscc-profile')) return;
 
-  const username = extractUsernameFromUrl();
-  if (!username) return;
+  const profile = parseTrackerProfilePath(location.pathname);
+  if (!profile) return;
 
   const guid = extractGuidFromPage();
   if (!guid) return;
 
+  const href = `https://stats.cc/siege/${encodeURIComponent(profile.username)}/${guid}`;
+  const nav = findTrackerProfileNav();
+  const template = nav && findInactiveTab(nav);
+
+  if (nav && template) {
+    appendClonedTab(nav, template, {
+      href,
+      label: 'Stats.cc',
+      title: `Open ${profile.username} on Stats.cc`,
+      markerClassName: 'r6ext-statscc-profile',
+    });
+    return;
+  }
+
   const firstCard = document.querySelector('.v3-grid .v3-card');
-  if (!firstCard) return;
-
-  const link = document.createElement('a');
-  link.href = `https://stats.cc/siege/${encodeURIComponent(username)}/${guid}`;
-  link.target = '_blank';
-  link.rel = 'noopener';
-  link.className = 'r6ext-statscc-profile';
-  link.title = `Open ${username} on Stats.cc`;
-  link.style.cssText = `
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 6px 12px; margin-bottom: 6px; border-radius: 6px;
-    background: hsla(37,52%,69%,0.08); border: 1px solid hsla(37,52%,69%,0.2);
-    color: hsl(37,52%,69%); font-size: 13px; font-weight: 600;
-    text-decoration: none; cursor: pointer; transition: all 0.15s ease;
-  `;
-  link.onmouseenter = () => {
-    link.style.background = 'hsla(37,52%,69%,0.15)';
-    link.style.borderColor = 'hsla(37,52%,69%,0.4)';
-  };
-  link.onmouseleave = () => {
-    link.style.background = 'hsla(37,52%,69%,0.08)';
-    link.style.borderColor = 'hsla(37,52%,69%,0.2)';
-  };
-
-  const icon = document.createElement('span');
-  icon.textContent = 'SC';
-  icon.style.cssText = `
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 20px; height: 20px; border-radius: 4px;
-    background: hsla(37,52%,69%,0.15); color: hsl(37,52%,69%);
-    font-size: 9px; font-weight: 800; line-height: 1;
-  `;
-
-  const label = document.createElement('span');
-  label.textContent = 'View on Stats.cc';
-
-  link.append(icon, label);
-  firstCard.before(link);
+  if (firstCard) {
+    const link = document.createElement('a');
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.className = 'r6ext-statscc-profile';
+    link.title = `Open ${profile.username} on Stats.cc`;
+    link.textContent = 'Stats.cc';
+    link.style.cssText = `
+      display: flex; align-items: center; justify-content: center;
+      padding: 6px 12px; margin-bottom: 6px; border-radius: 6px;
+      color: ${BRAND.statscc}; font-weight: 600; text-decoration: none;
+      border: 1px solid ${BRAND.statscc}33; background: ${BRAND.statscc}14;
+    `;
+    firstCard.before(link);
+  }
 }
 
 // --- Main ---
@@ -318,13 +309,18 @@ async function main(): Promise<void> {
 
 main();
 
-// Profile button: inject as soon as header appears, don't wait for match rows
-const profileObserver = new MutationObserver(() => {
-  if (!document.querySelector('.r6ext-statscc-profile')) {
-    injectStatsccProfileButton();
-  }
-});
+const PROFILE_OBSERVER_DEBOUNCE_MS = 150;
 const profileRoot = document.querySelector('.content, main, #app') ?? document.body;
+let profileDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const profileObserver = new MutationObserver(() => {
+  if (document.querySelector('.r6ext-statscc-profile')) return;
+  if (profileDebounce) return;
+  profileDebounce = setTimeout(() => {
+    profileDebounce = null;
+    injectStatsccProfileButton();
+  }, PROFILE_OBSERVER_DEBOUNCE_MS);
+});
 profileObserver.observe(profileRoot, { childList: true, subtree: true });
 
 // SPA navigation: lightweight URL polling
@@ -351,3 +347,18 @@ const loadMoreObserver = new MutationObserver(() => {
 
 const matchContainer = document.querySelector('.content, main, #app') ?? document.body;
 loadMoreObserver.observe(matchContainer, { childList: true, subtree: true });
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'EXTRACT_PROFILE_FROM_PAGE') return false;
+
+  const profile = parseTrackerProfilePath(location.pathname);
+  if (!profile) {
+    sendResponse(null);
+    return false;
+  }
+
+  sendResponse({ ...profile, guid: extractGuidFromPage() });
+  return false;
+});
+
+export {};

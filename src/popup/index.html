@@ -20,81 +20,125 @@
       </div>
     </header>
 
-    <!-- Profile Card -->
-    <div class="px-4 pt-3 pb-3">
-      <div class="flex items-start gap-3 p-3 bg-gray-900/60 border border-gray-800/60 rounded-xl">
-        <!-- Avatar -->
-        <div id="avatar-wrapper" class="shrink-0">
-          <div id="avatar-placeholder" class="w-12 h-12 rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-lg font-bold">?</div>
-          <img id="avatar-img" class="w-12 h-12 rounded-lg hidden object-cover" src="" alt="" />
+    <!-- ============ EMPTY STATE: Mode A (on a supported profile) ============ -->
+    <section id="empty-on-profile" class="hidden px-4 py-4 space-y-3">
+      <div class="text-[0.7rem] text-gray-500 leading-relaxed">
+        Detected profile on <span id="detected-source" class="font-medium text-gray-300"></span>:
+      </div>
+
+      <button id="btn-select-profile"
+        class="w-full px-3 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold rounded-lg transition shadow-sm shadow-orange-600/20 active:scale-[0.98]">
+        Select "<span id="detected-username"></span>" as your profile
+      </button>
+
+      <div id="select-error" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
+
+      <div class="text-center pt-1">
+        <button class="manual-toggle text-[0.7rem] text-gray-500 hover:text-gray-300 transition underline underline-offset-2">
+          or enter manually
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ EMPTY STATE: Mode B (not on a supported profile) ============ -->
+    <section id="empty-off-profile" class="hidden px-4 py-4 space-y-3">
+      <div class="text-[0.75rem] text-gray-400 leading-relaxed">Get started:</div>
+
+      <ol class="text-[0.7rem] text-gray-400 space-y-1.5 pl-4 list-decimal">
+        <li>
+          Visit your profile on one of:
+          <div class="mt-1.5 space-y-1">
+            <a href="https://tracker.gg/r6siege" target="_blank" rel="noopener"
+               class="block px-2.5 py-1.5 bg-gray-900/60 border border-gray-800/60 rounded-md hover:border-gray-700 transition text-[0.7rem]"
+               style="color: #FF3D2C;">→ Tracker.gg</a>
+            <a href="https://stats.cc/siege" target="_blank" rel="noopener"
+               class="block px-2.5 py-1.5 bg-gray-900/60 border border-gray-800/60 rounded-md hover:border-gray-700 transition text-[0.7rem]"
+               style="color: hsl(37,52%,69%);">→ Stats.cc</a>
+          </div>
+        </li>
+        <li class="pt-1">Reopen this popup and click <span class="text-gray-200 font-medium">Select Profile</span>.</li>
+      </ol>
+
+      <div class="border-t border-gray-800/60 pt-2 text-center">
+        <button class="manual-toggle text-[0.7rem] text-gray-500 hover:text-gray-300 transition underline underline-offset-2">
+          or enter manually
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ POPULATED STATE ============ -->
+    <section id="populated-section" class="hidden">
+      <!-- Profile Card -->
+      <div class="px-4 pt-3 pb-3">
+        <div class="flex items-start gap-3 p-3 bg-gray-900/60 border border-gray-800/60 rounded-xl">
+          <!-- Avatar -->
+          <div id="avatar-wrapper" class="shrink-0">
+            <div id="avatar-placeholder" class="w-12 h-12 rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-lg font-bold">?</div>
+            <img id="avatar-img" class="w-12 h-12 rounded-lg hidden object-cover" src="" alt="" />
+          </div>
+          <!-- Fields -->
+          <div class="flex-1 space-y-1.5">
+            <div class="flex gap-1.5">
+              <input id="username" type="text" placeholder="Username"
+                class="flex-1 px-2.5 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-sm placeholder:text-gray-600 focus:border-orange-600/50 focus:outline-none transition" />
+              <select id="platform"
+                class="px-2 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-xs text-gray-300 focus:border-orange-600/50 focus:outline-none transition">
+                <option value="ubi">PC</option>
+                <option value="psn">PSN</option>
+                <option value="xbl">Xbox</option>
+              </select>
+            </div>
+            <div class="flex gap-1.5">
+              <input id="guid" type="text" placeholder="GUID (for stats.cc)"
+                class="flex-1 px-2.5 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-[0.7rem] text-gray-400 placeholder:text-gray-600 focus:border-orange-600/50 focus:outline-none transition font-mono" />
+              <button id="btn-save" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition shadow-sm shadow-orange-600/20 shrink-0 active:scale-95">
+                Save
+              </button>
+            </div>
+          </div>
         </div>
-        <!-- Fields -->
-        <div class="flex-1 space-y-1.5">
-          <div class="flex gap-1.5">
-            <input id="username" type="text" placeholder="Username"
-              class="flex-1 px-2.5 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-sm placeholder:text-gray-600 focus:border-orange-600/50 focus:outline-none transition" />
-            <select id="platform"
-              class="px-2 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-xs text-gray-300 focus:border-orange-600/50 focus:outline-none transition">
-              <option value="ubi">PC</option>
-              <option value="psn">PSN</option>
-              <option value="xbl">Xbox</option>
-            </select>
+        <div id="save-status" class="text-[0.65rem] text-green-400 mt-1 px-1 hidden">Saved!</div>
+      </div>
+
+      <!-- Tracker Links -->
+      <div id="links-section" class="px-4 pb-4 space-y-1.5 hidden">
+        <div class="text-[0.6rem] text-gray-600 uppercase tracking-wider font-semibold px-1 pb-0.5">Quick Links</div>
+
+        <a id="link-trn" target="_blank" class="tracker-link group">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: rgba(255,61,44,0.1); border: 1px solid rgba(255,61,44,0.2); color: #FF3D2C;">TN</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Tracker.network</div>
+            <div class="text-[0.6rem] text-gray-500">Overview, operators, seasonal stats</div>
           </div>
-          <div class="flex gap-1.5">
-            <input id="guid" type="text" placeholder="GUID (for stats.cc)"
-              class="flex-1 px-2.5 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-[0.7rem] text-gray-400 placeholder:text-gray-600 focus:border-orange-600/50 focus:outline-none transition font-mono" />
-            <button id="btn-save" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg transition shadow-sm shadow-orange-600/20 shrink-0 active:scale-95">
-              Save
-            </button>
+          <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+
+        <a id="link-trn-matches" target="_blank" class="tracker-link group">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: rgba(255,61,44,0.1); border: 1px solid rgba(255,61,44,0.2); color: #FF3D2C;">TN</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Matches + RP Balance</div>
+            <div class="text-[0.6rem] text-gray-500">Match history with session RP summary</div>
           </div>
+          <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+
+        <a id="link-stats-cc" target="_blank" class="tracker-link group">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: hsla(37,52%,69%,0.1); border: 1px solid hsla(37,52%,69%,0.2); color: hsl(37,52%,69%);">SC</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Stats.cc</div>
+            <div class="text-[0.6rem] text-gray-500">Detailed analytics & performance</div>
+          </div>
+          <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+
+        <!-- Stats.cc GUID note -->
+        <div id="guid-note" class="hidden px-1 pt-1">
+          <p class="text-[0.6rem] text-gray-600 leading-relaxed">
+            <span class="font-medium" style="color: hsl(37,52%,69%)">stats.cc</span> requires a GUID instead of a username. Find it in your tracker.gg profile URL. Tracker.network accepts both username and GUID.
+          </p>
         </div>
       </div>
-      <div id="save-status" class="text-[0.65rem] text-green-400 mt-1 px-1 hidden">Saved!</div>
-    </div>
-
-    <!-- Tracker Links -->
-    <div id="links-section" class="px-4 pb-4 space-y-1.5 hidden">
-      <div class="text-[0.6rem] text-gray-600 uppercase tracking-wider font-semibold px-1 pb-0.5">Quick Links</div>
-
-      <a id="link-trn" target="_blank" class="tracker-link group">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: rgba(255,61,44,0.1); border: 1px solid rgba(255,61,44,0.2); color: #FF3D2C;">TN</div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Tracker.network</div>
-          <div class="text-[0.6rem] text-gray-500">Overview, operators, seasonal stats</div>
-        </div>
-        <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-      </a>
-
-      <a id="link-trn-matches" target="_blank" class="tracker-link group">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: rgba(255,61,44,0.1); border: 1px solid rgba(255,61,44,0.2); color: #FF3D2C;">TN</div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Matches + RP Balance</div>
-          <div class="text-[0.6rem] text-gray-500">Match history with session RP summary</div>
-        </div>
-        <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-      </a>
-
-      <a id="link-stats-cc" target="_blank" class="tracker-link group">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: hsla(37,52%,69%,0.1); border: 1px solid hsla(37,52%,69%,0.2); color: hsl(37,52%,69%);">SC</div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Stats.cc</div>
-          <div class="text-[0.6rem] text-gray-500">Detailed analytics & performance</div>
-        </div>
-        <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-      </a>
-
-      <!-- Stats.cc GUID note -->
-      <div id="guid-note" class="hidden px-1 pt-1">
-        <p class="text-[0.6rem] text-gray-600 leading-relaxed">
-          <span class="font-medium" style="color: hsl(37,52%,69%)">stats.cc</span> requires a GUID instead of a username. Find it in your tracker.gg profile URL. Tracker.network accepts both username and GUID.
-        </p>
-      </div>
-    </div>
-
-    <!-- No username message -->
-    <div id="no-username" class="px-4 pb-4 text-center py-6 hidden">
-      <div class="text-gray-600 text-xs">Enter your username to see tracker links</div>
-    </div>
+    </section>
 
   </div>
 

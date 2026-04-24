@@ -7,7 +7,9 @@ export async function getSettings(): Promise<UserSettings> {
   return { ...DEFAULT_SETTINGS, ...(result[KEY] as Partial<UserSettings> | undefined) };
 }
 
-export async function saveSettings(partial: Partial<UserSettings>): Promise<void> {
+export async function saveSettings(partial: Partial<UserSettings>): Promise<UserSettings> {
   const current = await getSettings();
-  await chrome.storage.local.set({ [KEY]: { ...current, ...partial } });
+  const merged = { ...current, ...partial };
+  await chrome.storage.local.set({ [KEY]: merged });
+  return merged;
 }
