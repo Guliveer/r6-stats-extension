@@ -1,5 +1,5 @@
 import { BRAND, GUID_RE, parseTrackerProfilePath } from '../lib/patterns';
-import { appendClonedTab, findInactiveTab } from './_shared';
+import { appendClonedTab, findInactiveTab, watchAndSendAvatar } from './_shared';
 
 function waitForMatchRows(timeout = 8_000): Promise<boolean> {
   return new Promise((resolve) => {
@@ -223,20 +223,11 @@ function injectRpBalances(): void {
 // --- Avatar extraction ---
 
 function extractAndSendAvatar(): void {
-  // Get username from URL
-  const match = location.pathname.match(/\/r6siege\/profile\/(ubi|psn|xbl)\/([^/]+)/);
-  if (!match) return;
-  const username = decodeURIComponent(match[2]);
-
-  // Find avatar image
-  const images = document.querySelectorAll<HTMLImageElement>('img');
-  for (const img of images) {
-    const src = img.src ?? '';
-    if (src.includes('avatar') || (src.includes('trackercdn') && src.includes('/r6') && img.width >= 40)) {
-      chrome.runtime.sendMessage({ type: 'SET_AVATAR', payload: { username, avatarUrl: src } });
-      return;
-    }
-  }
+  const profile = parseTrackerProfilePath(location.pathname);
+  if (!profile) return;
+  // Tracker.gg reliably renders an avatar element (even if it's a default) so absence after
+  // timeout means "no avatar" — clear any stale value.
+  watchAndSendAvatar({ ...profile, clearOnTimeout: true });
 }
 
 // --- Stats.cc profile link ---
@@ -247,6 +238,22 @@ function extractGuidFromPage(): string | null {
     const match = GUID_RE.exec(img.src);
     if (match) return match[0];
   }
+  return null;
+}
+
+// URLs like `/ubi/{guid}/overview` make the slug useless as a display name. Recover the
+// real name from avatar alt (tracker.gg renders it as "{name}'s Avatar") or the profile H1.
+function extractDisplayNameFromPage(): string | null {
+  const avatar = document.querySelector<HTMLImageElement>('img[src*="ubisoft-avatars"]');
+  const alt = avatar?.getAttribute('alt')?.trim();
+  if (alt) {
+    const m = alt.match(/^(.+?)['’]s\s+Avatar/i);
+    if (m) return m[1].trim();
+  }
+
+  const h1 = document.querySelector('h1')?.textContent?.trim();
+  if (h1) return h1;
+
   return null;
 }
 
@@ -357,7 +364,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
-  sendResponse({ ...profile, guid: extractGuidFromPage() });
+  sendResponse({
+    ...profile,
+    guid: extractGuidFromPage(),
+    displayName: extractDisplayNameFromPage(),
+  });
   return false;
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "r6-stats-extension",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "R6 Siege RP session tracker & quick links for tracker.gg",
   "type": "module",
   "scripts": {

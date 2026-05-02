@@ -1,5 +1,5 @@
 import { BRAND, GUID_RE, parseStatsccProfilePath } from '../lib/patterns';
-import { appendClonedTab, findInactiveTab } from './_shared';
+import { appendClonedTab, findInactiveTab, watchAndSendAvatar } from './_shared';
 
 const NAV_OBSERVER_DEBOUNCE_MS = 150;
 const PROFILE_NAV_GUID_RE = new RegExp(`/siege/[^/]+/${GUID_RE.source}`, 'i');
@@ -16,9 +16,10 @@ function findProfileNav(): HTMLElement | null {
   return null;
 }
 
-function createPlayerTrackerIcon(username: string): HTMLAnchorElement {
+function createPlayerTrackerIcon(username: string, guid: string): HTMLAnchorElement {
   const link = document.createElement('a');
-  link.href = `https://r6.tracker.network/r6siege/profile/ubi/${encodeURIComponent(username)}/overview`;
+  // Use GUID as the tracker.gg identifier — stable across username changes.
+  link.href = `https://r6.tracker.network/r6siege/profile/ubi/${encodeURIComponent(guid)}/overview`;
   link.target = '_blank';
   link.rel = 'noopener';
   link.className = 'r6ext-player-tracker';
@@ -46,10 +47,10 @@ function injectPlayerTrackerIcons(): void {
       if (playerLink.parentElement?.querySelector('.r6ext-player-tracker')) continue;
 
       const href = playerLink.getAttribute('href') || '';
-      const match = href.match(/\/siege\/([^/]+)\/[0-9a-f]{8}-/);
+      const match = href.match(/\/siege\/([^/]+)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
       if (!match) continue;
 
-      playerLink.appendChild(createPlayerTrackerIcon(decodeURIComponent(match[1])));
+      playerLink.appendChild(createPlayerTrackerIcon(decodeURIComponent(match[1]), match[2]));
     }
   }
 }
@@ -67,9 +68,9 @@ function injectProfileButton(): void {
   if (!template) return;
 
   // stats.cc URLs don't encode platform; default to ubi (stats.cc is PC-first).
-  // tracker.gg resolves by username regardless of platform, so cross-links still work.
+  // Use GUID as the tracker.gg identifier — stable across username changes.
   appendClonedTab(nav, template, {
-    href: `https://r6.tracker.network/r6siege/profile/ubi/${encodeURIComponent(profile.username)}/overview`,
+    href: `https://r6.tracker.network/r6siege/profile/ubi/${encodeURIComponent(profile.guid)}/overview`,
     label: 'Tracker.gg',
     title: `Open ${profile.username} on Tracker.gg`,
     markerClassName: 'r6ext-tracker-link',
@@ -96,9 +97,18 @@ function startObserving(): void {
   keepAlive.observe(root, { childList: true, subtree: true });
 }
 
+function extractAndSendAvatar(): void {
+  const profile = parseStatsccProfilePath(location.pathname);
+  if (!profile) return;
+  // stats.cc may render a profile without an avatar element at all — don't wipe a good value
+  // previously saved from tracker.gg just because the stats.cc layout changed.
+  watchAndSendAvatar({ platform: 'statscc', username: profile.username, clearOnTimeout: false });
+}
+
 function init(): void {
   injectProfileButton();
   injectPlayerTrackerIcons();
+  extractAndSendAvatar();
   startObserving();
 }
 
@@ -114,6 +124,7 @@ setInterval(() => {
   lastPath = location.pathname;
   document.querySelector('.r6ext-tracker-link')?.remove();
   document.querySelectorAll('.r6ext-player-tracker').forEach(el => el.remove());
+  extractAndSendAvatar();
 }, 300);
 
 export {};
