@@ -58,8 +58,8 @@ Three modes (popup → ⚙ Settings → "Rank icons"):
 | Mode | What changes |
 |---|---|
 | **Default** | Each site's native artwork — we touch nothing |
-| **New** | Force the post-rework v7 artwork everywhere; on stats.cc, swap legacy Champion icons to the bundled tracker.gg variant with the leaderboard rank baked in |
-| **Old** | Force the pre-rework artwork; tracker.gg Champion icons get a stats.cc-style minimalist composition with the top-X drawn over a clean shield |
+| **New** | Force the new (post-rework) design everywhere; on stats.cc, swap legacy Champion icons to the bundled tracker.gg variant with the leaderboard rank baked in |
+| **Old** | Force the old (pre-rework) design; tracker.gg Champion icons get a stats.cc-style minimalist composition with the top-X drawn over a clean shield |
 
 Stats.cc, side by side:
 
@@ -68,7 +68,7 @@ Stats.cc, side by side:
 | ![stats.cc default icons](docs/stats-cc-default-icons.png) | ![stats.cc new icons](docs/stats-cc-new-icons.png) | ![stats.cc old icons](docs/stats-cc-old-icons.png) |
 
 Tracker.gg, side by side (Default and New are identical because tracker.gg already
-serves v7 artwork):
+serves the new design natively):
 
 | Default / New | Old |
 |---|---|

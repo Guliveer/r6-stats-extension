@@ -1,14 +1,10 @@
 node_modules/
 dist/
-*.png
-!public/**
 .env
 .omc/
 .remember/
 **/superpowers/
 .claude/
 CLAUDE.md
-public/icons/*.svg
 screenshot-*.png
-!docs/**
 .playwright-mcp/

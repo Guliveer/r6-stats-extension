@@ -711,6 +711,11 @@ async function init(): Promise<void> {
   wireSmartLinkOpening();
   applyPreferencesToUI();
 
+  // Footer version label — single source of truth is the manifest, so we never need
+  // to keep this string in sync manually.
+  const versionEl = document.getElementById('footer-version');
+  if (versionEl) versionEl.textContent = `v${chrome.runtime.getManifest().version}`;
+
   if (settings.username || settings.guid) {
     renderPopulated(settings);
     wireDragAndDrop(document.getElementById('pinned-list')!);
