@@ -20,10 +20,18 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
-
-      - name: Generate PNG icons
+      - name: Generate extension icons
         run: node scripts/generate-icons.mjs
+
+      - name: Fetch tier rank icons
+        run: node scripts/scrape-rank-icons.mjs
+
+      - name: Fetch & compress champion-rank icons
+        run: |
+          node scripts/scrape-champion-ranks.mjs
+          node scripts/convert-champion-ranks.mjs
+
+      - run: npm run build
 
       - name: Get version
         id: version
@@ -50,8 +58,9 @@ jobs:
             5. Click **Load unpacked** and select the unzipped folder
 
             ### Features
-            - **RP Session Summary** — injected on tracker.gg match history pages
-            - **Daily RP badges** — per-day RP balance on match headers
-            - **Quick Links** — fast access to tracker.network and stats.cc
-            - **Auto-refresh** on "Load More"
+            - **Cross-site quick links** — Tracker.gg ↔ Stats.cc tabs on every profile and match
+            - **Pinned players** with current-season rank, ranked K/D, and RP
+            - **Rank icon swap** — Default / New / Old artwork toggle
+            - **RP session summary** — daily badges and 5-day banner on tracker.gg matches
+            - **Auto-refresh** of pinned ranks (configurable interval)
           files: r6-stats-extension-v${{ steps.version.outputs.version }}.zip

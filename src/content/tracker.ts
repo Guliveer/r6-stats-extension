@@ -1,18 +1,19 @@
-import { BRAND, GUID_RE, parseTrackerProfilePath } from '../lib/patterns';
+import { BRAND, GUID_RE, parseTrackerMatchPath, parseTrackerProfilePath } from '../lib/patterns';
 import { appendClonedTab, findInactiveTab, watchAndSendAvatar } from './_shared';
+import { startIconSwapObserver } from '../lib/icon-swap';
+import { DEFAULT_PREFERENCES } from '../lib/types';
+
+// --- RP balances (matches page only) ---
 
 function waitForMatchRows(timeout = 8_000): Promise<boolean> {
   return new Promise((resolve) => {
-    // Already present?
     if (document.querySelectorAll('.v3-match-row').length > 0) return resolve(true);
-
     const observer = new MutationObserver(() => {
       if (document.querySelectorAll('.v3-match-row').length > 0) {
         observer.disconnect();
         resolve(true);
       }
     });
-    // Only observe the main content area, not the entire body
     const root = document.querySelector('.content, main, #app') ?? document.body;
     observer.observe(root, { childList: true, subtree: true });
     setTimeout(() => { observer.disconnect(); resolve(false); }, timeout);
@@ -20,19 +21,19 @@ function waitForMatchRows(timeout = 8_000): Promise<boolean> {
 }
 
 function isMatchesPage(): boolean {
-  return location.pathname.includes('/matches');
+  return location.pathname.endsWith('/matches') || location.pathname.includes('/matches/');
 }
 
+// Inject per-day RP totals into the existing day-group headers + a session summary
+// banner above the match list. ONLY runs on /matches — overview gets nothing.
 function injectRpBalances(): void {
-  // Clean previous injections
+  if (!isMatchesPage()) return;
+
   document.querySelectorAll('.r6ext-rp-daily, .r6ext-rp-banner').forEach((el) => el.remove());
 
   const allMatchRows = document.querySelectorAll('.v3-match-row');
   if (allMatchRows.length === 0) return;
 
-  const compact = !isMatchesPage();
-
-  // --- Per-day RP badges in existing headers ---
   const dayGroups = document.querySelectorAll('.col-span-full.grid');
   const dayTotals: { label: string; rp: number; wins: number; losses: number; count: number }[] = [];
 
@@ -61,7 +62,6 @@ function injectRpBalances(): void {
 
     dayTotals.push({ label: dateLabel, rp: dayRp, wins, losses, count: matchRows.length });
 
-    // Inject badge into header
     const rpSign = dayRp >= 0 ? '+' : '';
     const rpColor = dayRp >= 0 ? '#4ade80' : '#f87171';
     const bgColor = dayRp >= 0 ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)';
@@ -81,9 +81,7 @@ function injectRpBalances(): void {
 
   if (dayTotals.length === 0) return;
 
-  // Limit to 5 sessions max in banner
   const cappedDays = dayTotals.slice(0, 5);
-
   const totalRp = cappedDays.reduce((s, d) => s + d.rp, 0);
   const totalMatches = cappedDays.reduce((s, d) => s + d.count, 0);
   const totalWins = cappedDays.reduce((s, d) => s + d.wins, 0);
@@ -91,130 +89,61 @@ function injectRpBalances(): void {
 
   const banner = document.createElement('div');
   banner.className = 'r6ext-rp-banner';
+  banner.style.cssText = `
+    grid-column: 1 / -1;
+    margin: 12px 0; padding: 18px 22px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2a4a; border-radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e0e0e0; width: 100%; box-sizing: border-box;
+  `;
 
-  if (compact) {
-    const totalSign = totalRp >= 0 ? '+' : '';
-    const rpColor = totalRp >= 0 ? '#4ade80' : '#f87171';
+  const titleRow = document.createElement('div');
+  titleRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;';
 
-    banner.style.cssText = `
-      grid-column: 1 / -1;
-      margin: 8px 0; padding: 10px 14px;
-      background: rgba(26, 26, 46, 0.8);
-      border: 1px solid #2a2a4a; border-radius: 8px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #e0e0e0; max-width: 300px;
+  const title = document.createElement('div');
+  title.textContent = 'RP Session Summary';
+  title.style.cssText = 'font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; font-weight: 600;';
+
+  const totalBadge = document.createElement('div');
+  const totalSign = totalRp >= 0 ? '+' : '';
+  totalBadge.textContent = `${totalSign}${totalRp} RP total • ${totalMatches} matches • ${totalWins}W/${totalLosses}L`;
+  totalBadge.style.cssText = `font-size: 13px; font-weight: 600; color: ${totalRp >= 0 ? '#4ade80' : '#f87171'};`;
+
+  titleRow.append(title, totalBadge);
+  banner.appendChild(titleRow);
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap;';
+
+  cappedDays.forEach((day) => {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      flex: 1; min-width: 110px; padding: 12px 14px;
+      background: rgba(255,255,255,0.04); border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
     `;
 
-    const row1 = document.createElement('div');
-    row1.style.cssText = 'display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;';
+    const lbl = document.createElement('div');
+    lbl.textContent = day.label;
+    lbl.style.cssText = 'font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: 500;';
+    card.appendChild(lbl);
 
-    const label = document.createElement('span');
-    label.textContent = 'Session RP';
-    label.style.cssText = 'font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #666; font-weight: 600;';
+    const rpVal = document.createElement('div');
+    const sign = day.rp >= 0 ? '+' : '';
+    rpVal.textContent = `${sign}${day.rp} RP`;
+    rpVal.style.cssText = `font-size: 22px; font-weight: 700; color: ${day.rp >= 0 ? '#4ade80' : '#f87171'};`;
+    card.appendChild(rpVal);
 
-    const rpEl = document.createElement('span');
-    rpEl.textContent = `${totalSign}${totalRp} RP`;
-    rpEl.style.cssText = `font-size: 16px; font-weight: 700; color: ${rpColor};`;
+    const meta = document.createElement('div');
+    meta.textContent = `${day.count} match${day.count === 1 ? '' : 'es'} • ${day.wins}W/${day.losses}L`;
+    meta.style.cssText = 'font-size: 11px; color: #888; margin-top: 4px;';
+    card.appendChild(meta);
 
-    const statsEl = document.createElement('span');
-    statsEl.textContent = `${totalMatches} matches \u2022 ${totalWins}W/${totalLosses}L`;
-    statsEl.style.cssText = 'font-size: 10px; color: #555; margin-left: auto;';
+    grid.appendChild(card);
+  });
 
-    row1.append(label, rpEl, statsEl);
-    banner.appendChild(row1);
-
-    const noteRow = document.createElement('div');
-    noteRow.style.cssText = 'display: flex; align-items: center; gap: 6px; margin-top: 2px;';
-
-    const note = document.createElement('span');
-    note.textContent = `Based on ${totalMatches} visible matches`;
-    note.style.cssText = 'font-size: 9px; color: #555;';
-    noteRow.appendChild(note);
-
-    const matchesUrl = location.href.replace(/\/overview.*$/, '/matches');
-    const link = document.createElement('a');
-    link.href = matchesUrl;
-    link.textContent = 'Full session \u2192';
-    link.style.cssText = 'font-size: 9px; color: #f97316; text-decoration: none; font-weight: 600;';
-    link.onmouseenter = () => { link.style.textDecoration = 'underline'; };
-    link.onmouseleave = () => { link.style.textDecoration = 'none'; };
-    noteRow.appendChild(link);
-    banner.appendChild(noteRow);
-
-    if (cappedDays.length > 1) {
-      const row2 = document.createElement('div');
-      row2.style.cssText = 'display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;';
-      cappedDays.forEach((day) => {
-        const chip = document.createElement('span');
-        const s = day.rp >= 0 ? '+' : '';
-        chip.textContent = `${day.label}: ${s}${day.rp}`;
-        chip.style.cssText = `
-          font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
-          color: ${day.rp >= 0 ? '#4ade80' : '#f87171'};
-          background: ${day.rp >= 0 ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)'};
-        `;
-        row2.appendChild(chip);
-      });
-      banner.appendChild(row2);
-    }
-
-  } else {
-    banner.style.cssText = `
-      grid-column: 1 / -1;
-      margin: 12px 0; padding: 18px 22px;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      border: 1px solid #2a2a4a; border-radius: 12px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #e0e0e0; width: 100%; box-sizing: border-box;
-    `;
-
-    const titleRow = document.createElement('div');
-    titleRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;';
-
-    const title = document.createElement('div');
-    title.textContent = 'RP Session Summary';
-    title.style.cssText = 'font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; font-weight: 600;';
-
-    const totalBadge = document.createElement('div');
-    const totalSign = totalRp >= 0 ? '+' : '';
-    totalBadge.textContent = `${totalSign}${totalRp} RP total \u2022 ${totalMatches} matches \u2022 ${totalWins}W/${totalLosses}L`;
-    totalBadge.style.cssText = `font-size: 13px; font-weight: 600; color: ${totalRp >= 0 ? '#4ade80' : '#f87171'};`;
-
-    titleRow.append(title, totalBadge);
-    banner.appendChild(titleRow);
-
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap;';
-
-    cappedDays.forEach((day) => {
-      const card = document.createElement('div');
-      card.style.cssText = `
-        flex: 1; min-width: 110px; padding: 12px 14px;
-        background: rgba(255,255,255,0.04); border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.06);
-      `;
-
-      const lbl = document.createElement('div');
-      lbl.textContent = day.label;
-      lbl.style.cssText = 'font-size: 11px; color: #aaa; margin-bottom: 6px; font-weight: 500;';
-      card.appendChild(lbl);
-
-      const rpVal = document.createElement('div');
-      const sign = day.rp >= 0 ? '+' : '';
-      rpVal.textContent = `${sign}${day.rp} RP`;
-      rpVal.style.cssText = `font-size: 22px; font-weight: 700; color: ${day.rp >= 0 ? '#4ade80' : '#f87171'};`;
-      card.appendChild(rpVal);
-
-      const meta = document.createElement('div');
-      meta.textContent = `${day.count} match${day.count === 1 ? '' : 'es'} \u2022 ${day.wins}W/${day.losses}L`;
-      meta.style.cssText = 'font-size: 11px; color: #888; margin-top: 4px;';
-      card.appendChild(meta);
-
-      grid.appendChild(card);
-    });
-
-    banner.appendChild(grid);
-  }
+  banner.appendChild(grid);
 
   const firstGroup = dayGroups[0];
   firstGroup?.parentElement?.insertBefore(banner, firstGroup);
@@ -261,6 +190,10 @@ function findTrackerProfileNav(): HTMLElement | null {
   return document.querySelector<HTMLElement>('.v3-tabs');
 }
 
+// Track which guids we've already asked the background to refresh in this page-view, so
+// the MutationObserver-driven re-runs don't trigger a fetch on every DOM mutation.
+const refreshedGuidsThisLoad = new Set<string>();
+
 function injectStatsccProfileButton(): void {
   if (document.querySelector('.r6ext-statscc-profile')) return;
 
@@ -269,6 +202,11 @@ function injectStatsccProfileButton(): void {
 
   const guid = extractGuidFromPage();
   if (!guid) return;
+
+  if (!refreshedGuidsThisLoad.has(guid)) {
+    refreshedGuidsThisLoad.add(guid);
+    chrome.runtime.sendMessage({ type: 'REFRESH_RANK_IF_PINNED', payload: { guid } });
+  }
 
   const href = `https://stats.cc/siege/${encodeURIComponent(profile.username)}/${guid}`;
   const nav = findTrackerProfileNav();
@@ -303,29 +241,115 @@ function injectStatsccProfileButton(): void {
   }
 }
 
+// --- Stats.cc match link ---
+
+// Match-drawer header lays out summary on the left and a `.trn-match-drawer__header-right`
+// container on the right that holds the Share button. We append our Stats.cc button there,
+// reusing tracker.gg's `.trn-button.trn-button--transparent` styling so it matches Share
+// pixel-for-pixel.
+function injectStatsccMatchButton(): void {
+  if (document.querySelector('.r6ext-statscc-match')) return;
+
+  const match = parseTrackerMatchPath(location.pathname);
+  if (!match) return;
+
+  const headerRight = document.querySelector<HTMLElement>('.trn-match-drawer__header-right');
+  if (!headerRight) return;
+
+  const link = document.createElement('a');
+  link.href = `https://stats.cc/siege/matches/${encodeURIComponent(match.matchGuid)}`;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.title = 'Open match on Stats.cc';
+  link.className = 'trn-button trn-button--transparent r6ext-statscc-match';
+
+  // Square SVG matching the size of Share's icon (24×24, drawn inside trn-button__icon).
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('class', 'trn-button__icon');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '2');
+  icon.setAttribute('stroke-linecap', 'round');
+  icon.setAttribute('stroke-linejoin', 'round');
+  // External-link glyph: a square with an arrow leaving its top-right corner.
+  const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path1.setAttribute('d', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6');
+  const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  path2.setAttribute('points', '15 3 21 3 21 9');
+  const path3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  path3.setAttribute('x1', '10');
+  path3.setAttribute('y1', '14');
+  path3.setAttribute('x2', '21');
+  path3.setAttribute('y2', '3');
+  icon.append(path1, path2, path3);
+
+  const label = document.createElement('div');
+  label.className = 'trn-button__label';
+  label.textContent = 'Stats.cc';
+
+  link.append(icon, label);
+  headerRight.appendChild(link);
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
-  const found = await waitForMatchRows();
-  if (found) {
-    injectRpBalances();
+  if (parseTrackerMatchPath(location.pathname)) {
+    injectStatsccMatchButton();
+    return;
   }
   extractAndSendAvatar();
   injectStatsccProfileButton();
+
+  // RP session summary lives only on /matches. waitForMatchRows debounces against the
+  // rest of the page initialization so we don't fight Vue hydration for layout slots.
+  if (isMatchesPage() && await waitForMatchRows()) {
+    injectRpBalances();
+    watchForLoadMore();
+  }
+}
+
+// "Load More" appends new .v3-match-row nodes; re-run injection so the daily badges and
+// banner refresh with the new rows.
+function watchForLoadMore(): void {
+  let lastCount = document.querySelectorAll('.v3-match-row').length;
+  let debounce: ReturnType<typeof setTimeout> | null = null;
+  const observer = new MutationObserver(() => {
+    const count = document.querySelectorAll('.v3-match-row').length;
+    if (count <= lastCount) return;
+    lastCount = count;
+    if (debounce) clearTimeout(debounce);
+    debounce = setTimeout(() => injectRpBalances(), 500);
+  });
+  const root = document.querySelector('.content, main, #app') ?? document.body;
+  observer.observe(root, { childList: true, subtree: true });
 }
 
 main();
+startRankIconSwapper();
+
+async function startRankIconSwapper(): Promise<void> {
+  const result = await chrome.storage.local.get('r6_preferences');
+  const prefs = (result['r6_preferences'] as { iconSet?: typeof DEFAULT_PREFERENCES.iconSet } | undefined) ?? {};
+  const iconSet = prefs.iconSet ?? DEFAULT_PREFERENCES.iconSet;
+  startIconSwapObserver(iconSet, 'tracker.gg');
+}
 
 const PROFILE_OBSERVER_DEBOUNCE_MS = 150;
 const profileRoot = document.querySelector('.content, main, #app') ?? document.body;
 let profileDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const profileObserver = new MutationObserver(() => {
-  if (document.querySelector('.r6ext-statscc-profile')) return;
   if (profileDebounce) return;
   profileDebounce = setTimeout(() => {
     profileDebounce = null;
-    injectStatsccProfileButton();
+    if (parseTrackerMatchPath(location.pathname)) {
+      if (!document.querySelector('.r6ext-statscc-match')) injectStatsccMatchButton();
+    } else if (!document.querySelector('.r6ext-statscc-profile')) {
+      injectStatsccProfileButton();
+    }
   }, PROFILE_OBSERVER_DEBOUNCE_MS);
 });
 profileObserver.observe(profileRoot, { childList: true, subtree: true });
@@ -338,22 +362,6 @@ setInterval(() => {
     setTimeout(main, 800);
   }
 }, 300);
-
-// "Load More" detection: re-inject when new match rows appear
-let lastMatchCount = document.querySelectorAll('.v3-match-row').length;
-let loadMoreDebounce: ReturnType<typeof setTimeout> | null = null;
-
-const loadMoreObserver = new MutationObserver(() => {
-  const currentCount = document.querySelectorAll('.v3-match-row').length;
-  if (currentCount > lastMatchCount) {
-    lastMatchCount = currentCount;
-    if (loadMoreDebounce) clearTimeout(loadMoreDebounce);
-    loadMoreDebounce = setTimeout(() => injectRpBalances(), 500);
-  }
-});
-
-const matchContainer = document.querySelector('.content, main, #app') ?? document.body;
-loadMoreObserver.observe(matchContainer, { childList: true, subtree: true });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'EXTRACT_PROFILE_FROM_PAGE') return false;

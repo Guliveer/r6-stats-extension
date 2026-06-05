@@ -17,3 +17,34 @@
   border-color: rgba(75, 85, 99, 0.6);
   background: rgba(17, 24, 39, 0.9);
 }
+
+/* Pinned list scrollbar — slim, brand-accented. WebKit + Firefox both supported.
+ * The thumb stays subtle until hover so it doesn't compete with player cards. */
+#pinned-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(249, 115, 22, 0.35) transparent;
+  scrollbar-gutter: stable;
+}
+
+#pinned-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#pinned-list::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+#pinned-list::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.25);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+#pinned-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.5);
+}
+
+#pinned-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 115, 22, 0.75);
+}

@@ -1,5 +1,8 @@
 import { BRAND, GUID_RE, parseStatsccMatchPath, parseStatsccProfilePath } from '../lib/patterns';
 import { appendClonedTab, findInactiveTab, watchAndSendAvatar } from './_shared';
+import { extractRankFromStatsccHtml } from '../lib/statscc-rank';
+import { startIconSwapObserver } from '../lib/icon-swap';
+import { DEFAULT_PREFERENCES } from '../lib/types';
 
 const NAV_OBSERVER_DEBOUNCE_MS = 150;
 const PROFILE_NAV_GUID_RE = new RegExp(`/siege/[^/]+/${GUID_RE.source}`, 'i');
@@ -75,11 +78,19 @@ function injectProfileButton(): void {
 
   // stats.cc URLs don't encode platform; default to ubi (stats.cc is PC-first).
   // Use GUID as the tracker.gg identifier — stable across username changes.
+  // Stats.cc nav uses `flex-wrap: wrap` inside an `overflow-y-clip` parent — without
+  // this override, an appended tab wraps to a clipped second row. Forcing nowrap keeps
+  // every tab on the first row; horizontal overflow is allowed by the parent's
+  // `overflow-x: visible`, so the user just sees the full row at full width.
+  const list = template.closest('ul');
+  if (list) (list as HTMLElement).style.flexWrap = 'nowrap';
+
   appendClonedTab(nav, template, {
     href: `https://r6.tracker.network/r6siege/profile/ubi/${encodeURIComponent(profile.guid)}/overview`,
     label: 'Tracker.gg',
     title: `Open ${profile.username} on Tracker.gg`,
     markerClassName: 'r6ext-tracker-link',
+    externalIcon: true,
   });
 }
 
@@ -153,10 +164,166 @@ function extractAndSendAvatar(): void {
   watchAndSendAvatar({ platform: 'statscc', username: profile.username, clearOnTimeout: false });
 }
 
+const RANK_TIER_GLOBAL_RE = /\b(Legend|Champion|Diamond|Emerald|Platinum|Gold|Silver|Bronze|Copper)(?:\s+(V|IV|III|II|I))?\b/gi;
+const RANK_UNRANKED_RE = /\b(?:no\s*rank|unranked)\b/i;
+const RANK_MMR_NEAR_RE = /(\d{3,5})\s*(?:MMR|RP)\b/i;
+const RANK_EXTRACTION_TIMEOUT_MS = 8_000;
+const RANK_POLL_MS = 500;
+
+const TOP_KEYWORDS = /\b(top|peak|max|best|highest|rekord|all[\s-]*time)\b/i;
+const CURRENT_KEYWORDS = /\b(current|season|now|live|aktualn)\b/i;
+
+interface RankCandidate {
+  tier: string;
+  division?: string;
+  index: number;
+  score: number;
+}
+
+// Stats.cc surfaces both the live season rank and a "Top Rank" tile. Score every tier
+// match by surrounding text: prefer "current"/"season" context, penalize "top"/"peak".
+// First match by score wins; ties resolved by document order (live rank usually appears
+// near the top of the profile card, before historical tiles).
+function scoreRankCandidate(text: string, idx: number): number {
+  const before = text.slice(Math.max(0, idx - 80), idx);
+  const after = text.slice(idx, Math.min(text.length, idx + 60));
+  const window = `${before} ${after}`;
+  let score = 0;
+  if (CURRENT_KEYWORDS.test(window)) score += 10;
+  if (TOP_KEYWORDS.test(window)) score -= 15;
+  return score;
+}
+
+// Find the DOM node containing a piece of text, then walk up to a parent that also
+// contains a rank icon img. Used to anchor the icon to the chosen tier text.
+function findRankIconNear(tierText: string, divisionText?: string): string | null {
+  const needle = divisionText ? `${tierText} ${divisionText}` : tierText;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let textNode: Text | null = null;
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    if (node.textContent && new RegExp(`\\b${needle}\\b`, 'i').test(node.textContent)) {
+      textNode = node;
+      break;
+    }
+  }
+  if (!textNode) return null;
+
+  // Walk up to 5 levels — far enough to find a sibling icon, close enough to avoid
+  // grabbing the unrelated profile avatar.
+  let parent: HTMLElement | null = textNode.parentElement;
+  for (let i = 0; i < 5 && parent; i++, parent = parent.parentElement) {
+    const img = parent.querySelector<HTMLImageElement>(
+      'img[src*="rank"], img[src*="badge"], img[alt*="rank" i], img[alt*="' + tierText + '" i]'
+    );
+    if (img?.src) return img.src;
+  }
+  return null;
+}
+
+function extractRankFromDom(): { tier: string; division?: string; mmr?: number; iconUrl?: string } | null {
+  const text = document.body?.innerText ?? '';
+
+  const candidates: RankCandidate[] = [];
+  RANK_TIER_GLOBAL_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = RANK_TIER_GLOBAL_RE.exec(text)) !== null) {
+    candidates.push({
+      tier: m[1],
+      division: m[2]?.toUpperCase(),
+      index: m.index,
+      score: scoreRankCandidate(text, m.index),
+    });
+  }
+
+  if (candidates.length === 0) {
+    if (RANK_UNRANKED_RE.test(text)) return { tier: 'No rank' };
+    return null;
+  }
+
+  candidates.sort((a, b) => b.score - a.score || a.index - b.index);
+  const best = candidates[0];
+
+  // MMR appears near the rank label — search the 200-char window around the chosen match
+  // rather than the first MMR globally (which would otherwise leak from a stat tile).
+  const window = text.slice(Math.max(0, best.index - 100), best.index + 200);
+  const mmrMatch = RANK_MMR_NEAR_RE.exec(window);
+
+  const iconUrl = findRankIconNear(best.tier, best.division) ?? undefined;
+
+  return {
+    tier: best.tier,
+    division: best.division,
+    mmr: mmrMatch ? parseInt(mmrMatch[1], 10) : undefined,
+    iconUrl,
+  };
+}
+
+function extractAndSendRank(): void {
+  const profile = parseStatsccProfilePath(location.pathname);
+  if (!profile) return;
+
+  const start = Date.now();
+  const tryOnce = (): boolean => {
+    // Primary path: stats.cc embeds the SSR Nuxt payload in <script id="__NUXT_DATA__">.
+    // Parsing it gives us the player's profile object deterministically — current-season
+    // rank, RP, and ranked K/D, no regex over rendered text.
+    const data = extractRankFromStatsccHtml(document.documentElement.outerHTML, profile.guid);
+    if (data) {
+      chrome.runtime.sendMessage({
+        type: 'SET_PLAYER_RANK',
+        payload: {
+          guid: profile.guid,
+          rank: { ...data.rank, fetchedAt: Date.now() },
+          rankedStats: data.rankedStats,
+        },
+      });
+      return true;
+    }
+    // Fallback: regex over rendered text (only triggers if SSR script is missing).
+    const rank = extractRankFromDom();
+    if (!rank) return false;
+    chrome.runtime.sendMessage({
+      type: 'SET_PLAYER_RANK',
+      payload: { guid: profile.guid, rank: { ...rank, fetchedAt: Date.now() } },
+    });
+    return true;
+  };
+
+  if (tryOnce()) return;
+  const interval = setInterval(() => {
+    if (tryOnce() || Date.now() - start > RANK_EXTRACTION_TIMEOUT_MS) clearInterval(interval);
+  }, RANK_POLL_MS);
+}
+
+// Synchronous rank extraction for callers (e.g. service-worker pinning the current tab)
+// who need the data right now and have decided this tab is on a stats.cc profile.
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'EXTRACT_RANK_FROM_PAGE') return false;
+
+  const profile = parseStatsccProfilePath(location.pathname);
+  if (!profile) {
+    sendResponse(null);
+    return false;
+  }
+
+  const data = extractRankFromStatsccHtml(document.documentElement.outerHTML, profile.guid);
+  if (!data) {
+    sendResponse(null);
+    return false;
+  }
+  sendResponse({
+    rank: { ...data.rank, fetchedAt: Date.now() },
+    rankedStats: data.rankedStats,
+  });
+  return false;
+});
+
 function init(): void {
   if (parseStatsccProfilePath(location.pathname)) {
     injectProfileButton();
     extractAndSendAvatar();
+    extractAndSendRank();
   }
   if (parseStatsccMatchPath(location.pathname)) {
     injectMatchTrackerButton();
@@ -167,6 +334,17 @@ function init(): void {
 function initWithObserver(): void {
   init();
   startObserving();
+  startRankIconSwapper();
+}
+
+// Pull the user's iconSet pref from storage and start the cross-site icon swapper.
+// `auto` on stats.cc keeps the page's chosen artwork (with the legacy-Champion override
+// handled by resolveIconSlug); `new`/`old` rewrite every rank img unconditionally.
+async function startRankIconSwapper(): Promise<void> {
+  const result = await chrome.storage.local.get('r6_preferences');
+  const prefs = (result['r6_preferences'] as { iconSet?: typeof DEFAULT_PREFERENCES.iconSet } | undefined) ?? {};
+  const iconSet = prefs.iconSet ?? DEFAULT_PREFERENCES.iconSet;
+  startIconSwapObserver(iconSet, 'stats.cc');
 }
 
 if (document.readyState === 'loading') {

@@ -1,7 +1,20 @@
-import { type UserSettings, type PinnedPlayer, type Platform, DEFAULT_SETTINGS } from './types';
+import {
+  type UserSettings,
+  type PinnedPlayer,
+  type Platform,
+  type PlayerRank,
+  type RankedStats,
+  type UserPreferences,
+  DEFAULT_SETTINGS,
+  DEFAULT_PREFERENCES,
+  MIN_REFRESH_MINUTES,
+  MIN_VISIBLE_PINNED,
+  MAX_VISIBLE_PINNED,
+} from './types';
 
 const KEY = 'r6_settings';
 const PINNED_KEY = 'r6_pinned_players';
+const PREFS_KEY = 'r6_preferences';
 
 export async function getSettings(): Promise<UserSettings> {
   const result = await chrome.storage.local.get(KEY);
@@ -63,4 +76,54 @@ export async function reorderPinnedPlayers(
 
   await chrome.storage.local.set({ [PINNED_KEY]: reordered });
   return reordered;
+}
+
+export async function setPinnedPlayerRank(
+  guid: string,
+  rank: PlayerRank,
+  rankedStats?: RankedStats,
+): Promise<PinnedPlayer[]> {
+  const list = await getPinnedPlayers();
+  let changed = false;
+  const next = list.map((p) => {
+    if (p.guid !== guid) return p;
+    changed = true;
+    // Don't drop existing stats when caller only ships rank — but always overwrite when
+    // a fresh stats object is supplied (even an empty one means "we looked, nothing there").
+    return { ...p, rank, rankedStats: rankedStats !== undefined ? rankedStats : p.rankedStats };
+  });
+  if (!changed) return list;
+  await chrome.storage.local.set({ [PINNED_KEY]: next });
+  return next;
+}
+
+export async function getPreferences(): Promise<UserPreferences> {
+  const result = await chrome.storage.local.get(PREFS_KEY);
+  const raw = (result[PREFS_KEY] as Partial<UserPreferences> | undefined) ?? {};
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...raw,
+    pinnedAutoRefresh: { ...DEFAULT_PREFERENCES.pinnedAutoRefresh, ...(raw.pinnedAutoRefresh ?? {}) },
+  };
+}
+
+export async function savePreferences(partial: Partial<UserPreferences>): Promise<UserPreferences> {
+  const current = await getPreferences();
+  const merged: UserPreferences = {
+    ...current,
+    ...partial,
+    pinnedAutoRefresh: { ...current.pinnedAutoRefresh, ...(partial.pinnedAutoRefresh ?? {}) },
+  };
+  // Clamp at the storage layer so neither the popup nor a stale message can persist
+  // out-of-range values that would cause Chrome to reject the alarm.
+  merged.pinnedAutoRefresh.intervalMinutes = Math.max(
+    MIN_REFRESH_MINUTES,
+    Math.round(merged.pinnedAutoRefresh.intervalMinutes),
+  );
+  merged.visiblePinnedCount = Math.min(
+    MAX_VISIBLE_PINNED,
+    Math.max(MIN_VISIBLE_PINNED, Math.round(merged.visiblePinnedCount)),
+  );
+  await chrome.storage.local.set({ [PREFS_KEY]: merged });
+  return merged;
 }

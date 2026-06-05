@@ -1,7 +1,7 @@
 {
   "name": "r6-stats-extension",
-  "version": "3.2.0",
-  "description": "R6 Siege RP session tracker & quick links for tracker.gg",
+  "version": "4.0.0",
+  "description": "Cross-site quick links between tracker.gg and stats.cc + pinned players with current rank and ranked K/D",
   "type": "module",
   "scripts": {
     "dev": "vite",

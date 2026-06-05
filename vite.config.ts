@@ -22,10 +22,12 @@ const entries = {
   popup: {
     input: { popup: resolve(__dirname, 'src/popup/index.html') },
     emptyOutDir: true,
+    // Vite's built-in publicDir already copies `public/` to the dist root verbatim
+    // (so public/icons/icon16.png → dist/icons/icon16.png). viteStaticCopy is reserved
+    // for files OUTSIDE public/ — here just manifest.json at the repo root.
     plugins: [tailwindcss(), viteStaticCopy({
       targets: [
         { src: 'manifest.json', dest: '.' },
-        { src: 'public/icons/*.png', dest: 'icons' },
       ],
     }), removeCrossorigin()] as Plugin[],
   },
