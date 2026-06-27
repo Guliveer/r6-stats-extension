@@ -1,0 +1,11 @@
+# Linguist overrides
+
+# Dependencies and build output — exclude from language stats
+node_modules/** linguist-vendored
+dist/** linguist-generated
+
+# Source maps are generated
+*.map linguist-generated
+
+# Lock files are generated
+package-lock.json linguist-generated

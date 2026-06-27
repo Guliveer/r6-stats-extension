@@ -1,6 +1,15 @@
 node_modules/
 dist/
+
+# Secrets and local overrides — never commit
 .env
+.env.*
+!.env.example
+*.local
+*.local.*
+!*.example
+!*.example.*
+
 .omc/
 .remember/
 **/superpowers/
