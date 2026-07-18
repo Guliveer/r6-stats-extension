@@ -17,3 +17,5 @@ dist/
 CLAUDE.md
 screenshot-*.png
 .playwright-mcp/
+
+.omo/

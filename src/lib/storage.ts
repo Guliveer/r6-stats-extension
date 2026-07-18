@@ -8,8 +8,6 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_PREFERENCES,
   MIN_REFRESH_MINUTES,
-  MIN_VISIBLE_PINNED,
-  MAX_VISIBLE_PINNED,
 } from './types';
 
 const KEY = 'r6_settings';
@@ -119,10 +117,6 @@ export async function savePreferences(partial: Partial<UserPreferences>): Promis
   merged.pinnedAutoRefresh.intervalMinutes = Math.max(
     MIN_REFRESH_MINUTES,
     Math.round(merged.pinnedAutoRefresh.intervalMinutes),
-  );
-  merged.visiblePinnedCount = Math.min(
-    MAX_VISIBLE_PINNED,
-    Math.max(MIN_VISIBLE_PINNED, Math.round(merged.visiblePinnedCount)),
   );
   await chrome.storage.local.set({ [PREFS_KEY]: merged });
   return merged;

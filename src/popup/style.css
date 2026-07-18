@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+body {
+  scrollbar-gutter: stable both-edges;
+}
+
 .tracker-link {
   display: flex;
   align-items: center;

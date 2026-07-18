@@ -67,17 +67,6 @@
               <span class="text-[0.7rem] text-gray-400">minutes</span>
             </div>
           </fieldset>
-
-          <!-- Visible pinned -->
-          <fieldset class="space-y-1.5">
-            <legend class="text-[0.65rem] uppercase tracking-wider text-gray-500 font-semibold">Pinned list height</legend>
-            <div class="flex items-center gap-2">
-              <span class="text-[0.7rem] text-gray-400">Show</span>
-              <input id="prefs-visible" type="number" min="1" max="10" step="1"
-                class="w-16 px-2 py-1 bg-gray-800/80 border border-gray-700/50 rounded text-xs text-gray-200 focus:border-orange-600/50 focus:outline-none" />
-              <span class="text-[0.7rem] text-gray-400">players before scrolling</span>
-            </div>
-          </fieldset>
         </div>
 
       </div>
@@ -227,7 +216,7 @@
 
         <div id="pin-error" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
 
-        <div id="pinned-list" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+        <div id="pinned-list" class="flex flex-col gap-1.5 max-h-48 overflow-y-auto"></div>
 
         <div id="pinned-empty" class="hidden text-[0.65rem] text-gray-600 leading-relaxed px-1 py-2 text-center">
           No pinned players yet.<br />Open a profile tab and click <span class="text-gray-400 font-medium">Pin current profile</span>.

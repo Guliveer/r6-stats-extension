@@ -25,15 +25,10 @@ export interface UserPreferences {
     enabled: boolean;
     intervalMinutes: number;
   };
-  // How many pinned players fit in the popup before the list starts scrolling.
-  visiblePinnedCount: number;
 }
 
 export const MIN_REFRESH_MINUTES = 30;
 export const DEFAULT_REFRESH_MINUTES = 180;
-export const MIN_VISIBLE_PINNED = 1;
-export const MAX_VISIBLE_PINNED = 10;
-export const DEFAULT_VISIBLE_PINNED = 3;
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
   iconSet: 'auto',
@@ -41,7 +36,6 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
     enabled: true,
     intervalMinutes: DEFAULT_REFRESH_MINUTES,
   },
-  visiblePinnedCount: DEFAULT_VISIBLE_PINNED,
 };
 
 export interface UserSettings {

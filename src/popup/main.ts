@@ -1,5 +1,5 @@
 import type { UserSettings, PinnedPlayer, PinFailReason, Message, SelectProfileResponse, PinResponse, PlayerRank, RankedStats, UserPreferences } from '../lib/types';
-import { DEFAULT_PREFERENCES, MIN_REFRESH_MINUTES, MIN_VISIBLE_PINNED, MAX_VISIBLE_PINNED } from '../lib/types';
+import { DEFAULT_PREFERENCES, MIN_REFRESH_MINUTES } from '../lib/types';
 import { parseStatsccProfileUrl, parseTrackerProfileUrl } from '../lib/patterns';
 import { lookupRank } from '../lib/ranks';
 import { resolveIconSlug } from '../lib/statscc-rank';
@@ -561,9 +561,6 @@ function renderPinnedList(players: PinnedPlayer[]): void {
     });
     container.appendChild(card);
   }
-
-  // Cards exist now → measure them and re-apply max-height with real numbers.
-  applyVisiblePinned();
 }
 
 async function wirePinCurrent(): Promise<void> {
@@ -599,40 +596,12 @@ async function wirePinCurrent(): Promise<void> {
 
 // --- Settings modal ---
 
-function applyVisiblePinned(): void {
-  const list = document.getElementById('pinned-list');
-  if (!list) return;
-
-  const n = currentPreferences.visiblePinnedCount;
-  const firstCard = list.firstElementChild as HTMLElement | null;
-  if (!firstCard) {
-    list.style.maxHeight = `${n * 60}px`;
-    return;
-  }
-  // Measure card and gap from real layout. Tailwind's `space-y-1.5` uses
-  // `> * + * { margin-top: 6px }` instead of CSS `gap`, so reading getComputedStyle
-  // on the list returns gap:0. We grab the second card's marginTop instead.
-  const cardHeight = firstCard.getBoundingClientRect().height;
-  const secondCard = firstCard.nextElementSibling as HTMLElement | null;
-  const gap = secondCard ? parseFloat(window.getComputedStyle(secondCard).marginTop) || 0 : 6;
-
-  // N cards + (N-1) gaps, plus a generous slack for sub-pixel rounding and any
-  // box-shadow/outline that protrudes past getBoundingClientRect.
-  // Add a full gap of slack on top of the math — covers sub-pixel rounding, late-loading
-  // images that shift card height after measurement, and any box-shadow/border that
-  // extends below getBoundingClientRect.
-  const total = Math.ceil(n * cardHeight + n * gap) + 4;
-  list.style.maxHeight = `${total}px`;
-}
-
 function applyPreferencesToUI(): void {
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="iconSet"]')) {
     radio.checked = radio.value === currentPreferences.iconSet;
   }
   (document.getElementById('prefs-autorefresh') as HTMLInputElement).checked = currentPreferences.pinnedAutoRefresh.enabled;
   (document.getElementById('prefs-interval') as HTMLInputElement).value = String(currentPreferences.pinnedAutoRefresh.intervalMinutes);
-  (document.getElementById('prefs-visible') as HTMLInputElement).value = String(currentPreferences.visiblePinnedCount);
-  applyVisiblePinned();
 }
 
 async function persistPreferences(partial: Partial<UserPreferences>): Promise<void> {
@@ -685,15 +654,6 @@ function wireSettingsModal(): void {
   };
   interval.addEventListener('change', commitInterval);
   interval.addEventListener('blur', commitInterval);
-
-  const visible = document.getElementById('prefs-visible') as HTMLInputElement;
-  const commitVisible = (): void => {
-    const count = Math.min(MAX_VISIBLE_PINNED, Math.max(MIN_VISIBLE_PINNED, Math.round(Number(visible.value) || MIN_VISIBLE_PINNED)));
-    visible.value = String(count);
-    persistPreferences({ visiblePinnedCount: count });
-  };
-  visible.addEventListener('change', commitVisible);
-  visible.addEventListener('blur', commitVisible);
 }
 
 async function init(): Promise<void> {
