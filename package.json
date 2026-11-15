@@ -1,6 +1,6 @@
 {
   "name": "r6-stats-extension",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Cross-site quick links between tracker.gg and stats.cc + pinned players with current rank and ranked K/D",
   "type": "module",
   "scripts": {
