@@ -5,6 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>R6 Stats Extension</title>
   <link rel="stylesheet" href="./style.css" />
+  <style>
+    /* Keyboard focus must stay visible: several controls rely on a low-contrast border
+       change and Tailwind's focus:outline-none, which leaves nothing for keyboard users.
+       Declared after the stylesheet so it wins against those utilities. */
+    :focus-visible {
+      outline: 2px solid rgb(249 115 22 / 0.85);
+      outline-offset: 2px;
+    }
+
+    /* Tailwind v4 leaves buttons on the default cursor. */
+    button:not(:disabled) {
+      cursor: pointer;
+    }
+
+    /* Default scrollbar is a bright system bar on a near-black popup. */
+    #pinned-list {
+      scrollbar-width: thin;
+      scrollbar-color: #374151 transparent;
+    }
+    #pinned-list::-webkit-scrollbar {
+      width: 8px;
+    }
+    #pinned-list::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 9999px;
+    }
+    #pinned-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
 </head>
 <body class="w-[380px] bg-gray-950 text-gray-100">
   <div id="app" class="flex flex-col">
@@ -94,10 +131,14 @@
         Select "<span id="detected-username"></span>" as your profile
       </button>
 
-      <div id="select-error" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
+      <div id="select-error" role="alert" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
+
+      <p class="text-[0.65rem] text-gray-500 leading-relaxed text-center px-2">
+        Pinning tracks their current rank, RP and ranked K/D in this popup.
+      </p>
 
       <div class="text-center pt-1">
-        <button class="manual-toggle text-[0.7rem] text-gray-500 hover:text-gray-300 transition underline underline-offset-2">
+        <button class="manual-toggle text-[0.7rem] text-gray-400 hover:text-gray-200 transition underline underline-offset-2">
           or enter manually
         </button>
       </div>
@@ -107,7 +148,7 @@
     <section id="empty-off-profile" class="hidden px-4 py-4 space-y-3">
       <div class="text-[0.75rem] text-gray-400 leading-relaxed">Get started:</div>
 
-      <ol class="text-[0.7rem] text-gray-400 space-y-1.5 pl-4 list-decimal">
+      <ol class="text-[0.7rem] text-gray-400 space-y-1.5 pl-4 list-decimal marker:text-gray-500">
         <li>
           Visit your profile on one of:
           <div class="mt-1.5 space-y-1">
@@ -143,7 +184,7 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline gap-1.5 min-w-0">
                 <span id="profile-username" class="text-sm font-semibold text-gray-100 truncate"></span>
-                <span id="profile-platform" class="text-[0.6rem] text-gray-600 uppercase shrink-0"></span>
+                <span id="profile-platform" class="text-[0.6rem] text-gray-500 uppercase shrink-0"></span>
               </div>
               <div id="profile-rank" class="mt-1"></div>
             </div>
@@ -181,18 +222,18 @@
             </div>
           </div>
         </div>
-        <div id="save-status" class="text-[0.65rem] text-green-400 mt-1 px-1 hidden">Saved!</div>
+        <div id="save-status" role="status" aria-live="polite" class="text-[0.65rem] text-green-400 mt-1 px-1 hidden">Saved!</div>
       </div>
 
       <!-- Tracker Links -->
       <div id="links-section" class="px-4 pb-3 pt-3 space-y-1.5 hidden">
-        <div class="text-[0.6rem] text-gray-600 uppercase tracking-wider font-semibold px-1 pb-0.5">Quick Links</div>
+        <div class="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold px-1 pb-0.5">Quick Links</div>
 
         <a id="link-trn" target="_blank" class="tracker-link group">
           <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: rgba(255,61,44,0.1); border: 1px solid rgba(255,61,44,0.2); color: #FF3D2C;">TN</div>
           <div class="flex-1 min-w-0">
             <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Tracker.network</div>
-            <div class="text-[0.6rem] text-gray-500">Overview, operators, seasonal stats</div>
+            <div class="text-[0.6rem] text-gray-400">Overview, operators, seasonal stats</div>
           </div>
           <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         </a>
@@ -201,14 +242,14 @@
           <div class="w-8 h-8 rounded-lg flex items-center justify-center text-[0.65rem] font-bold shrink-0 transition" style="background: hsla(37,52%,69%,0.1); border: 1px solid hsla(37,52%,69%,0.2); color: hsl(37,52%,69%);">SC</div>
           <div class="flex-1 min-w-0">
             <div class="text-[0.8rem] font-medium text-gray-200 group-hover:text-white transition">Stats.cc</div>
-            <div class="text-[0.6rem] text-gray-500">Detailed analytics & performance</div>
+            <div class="text-[0.6rem] text-gray-400">Detailed analytics & performance</div>
           </div>
           <svg class="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-500 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         </a>
 
         <!-- Stats.cc GUID note -->
         <div id="guid-note" class="hidden px-1 pt-1">
-          <p class="text-[0.6rem] text-gray-600 leading-relaxed">
+          <p class="text-[0.6rem] text-gray-500 leading-relaxed">
             <span class="font-medium" style="color: hsl(37,52%,69%)">stats.cc</span> requires a GUID instead of a username. Find it in your tracker.gg profile URL. Tracker.network accepts both username and GUID.
           </p>
         </div>
@@ -217,7 +258,7 @@
       <!-- Pinned Players -->
       <div id="pinned-section" class="px-4 pb-4 pt-1 space-y-2 border-t border-gray-800/60">
         <div class="flex items-center justify-between pt-2">
-          <div class="text-[0.6rem] text-gray-600 uppercase tracking-wider font-semibold px-1">Pinned Players</div>
+          <div class="text-[0.65rem] text-gray-500 uppercase tracking-wider font-semibold px-1">Pinned Players</div>
         </div>
 
         <button id="btn-pin-current"
@@ -225,11 +266,11 @@
           + Pin current profile
         </button>
 
-        <div id="pin-error" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
+        <div id="pin-error" role="alert" class="hidden text-[0.65rem] text-yellow-400 leading-relaxed px-1"></div>
 
         <div id="pinned-list" class="flex flex-col gap-1.5 max-h-48 overflow-y-auto"></div>
 
-        <div id="pinned-empty" class="hidden text-[0.65rem] text-gray-600 leading-relaxed px-1 py-2 text-center">
+        <div id="pinned-empty" class="hidden text-[0.65rem] text-gray-500 leading-relaxed px-1 py-2 text-center">
           No pinned players yet.<br />Open a profile tab and click <span class="text-gray-400 font-medium">Pin current profile</span>.
         </div>
       </div>
@@ -256,7 +297,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="flex items-center justify-between px-4 py-2 border-t border-gray-800/60 text-[0.6rem] text-gray-600">
+    <footer class="flex items-center justify-between px-4 py-2 border-t border-gray-800/60 text-[0.6rem] text-gray-500">
       <a href="https://github.com/Guliveer/r6-stats-extension" target="_blank" rel="noopener"
         class="flex items-center gap-1 hover:text-gray-300 transition" title="Source on GitHub">
         <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>

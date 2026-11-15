@@ -285,7 +285,12 @@ function wireSaveButton(initialSettings: UserSettings): void {
 
     // Preserves avatarUrl from initial load — service worker never overwrites it on manual save.
     const newSettings: UserSettings = { ...initialSettings, username, platform, guid };
+    const saveBtn = document.getElementById('btn-save') as HTMLButtonElement;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
     await sendMessage({ type: 'SAVE_SETTINGS', payload: { username, platform, guid } });
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
 
     updateAvatar(newSettings);
     updateLinks(newSettings);
@@ -580,11 +585,15 @@ async function wirePinCurrent(): Promise<void> {
   }
 
   btn.addEventListener('click', async () => {
+    const label = btn.textContent;
     btn.disabled = true;
+    // Pinning may hit the stats.cc API before answering; show that something is happening.
+    btn.textContent = 'Pinning…';
     err.classList.add('hidden');
 
     const response = await sendMessage<PinResponse>({ type: 'PIN_CURRENT_TAB' });
 
+    btn.textContent = label;
     btn.disabled = false;
 
     if (response.ok) {
