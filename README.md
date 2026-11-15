@@ -145,9 +145,14 @@ and load unpacked.
 - **TypeScript** + **Vite** (build)
 - **Tailwind CSS v4** (popup styling)
 - **Chrome Manifest V3** (service worker, content scripts, alarms, storage)
-- Rank data is parsed from `<script id="__NUXT_DATA__">` in stats.cc HTML — deterministic,
-  no API guessing. URL conventions, DOM layouts, and per-site/per-mode swap rules are
-  documented in [`docs/page-structure.md`](docs/page-structure.md).
+- Rank, RP and ranked K/D come from stats.cc's own public JSON API
+  (`api.stats.cc/siege/v2/profiles/{guid}`, plus `/config` for the live season slug) — no
+  key, no account. If that request fails, the extension falls back to parsing
+  `<script id="__NUXT_DATA__">` from the stats.cc HTML. Endpoint reference:
+  [`docs/statscc-api.md`](docs/statscc-api.md). URL conventions, DOM layouts and
+  per-site/per-mode swap rules are in [`docs/page-structure.md`](docs/page-structure.md).
+- Why no third-party R6 stats API is used — providers evaluated and rejected:
+  [`docs/data-sources.md`](docs/data-sources.md).
 - Champion top-X overlay on tracker.gg + Old uses an in-memory canvas composer
   (`src/lib/champion-overlay.ts`) onto the bundled `champion-small.webp`.
 

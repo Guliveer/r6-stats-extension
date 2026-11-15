@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "R6 Stats Extension",
-  "version": "4.0.2",
+  "version": "5.0.0",
   "description": "Quick links between tracker.gg and stats.cc + pinned players with current rank and ranked K/D",
   "permissions": ["storage", "alarms", "tabs"],
   "host_permissions": [
     "https://r6.tracker.network/*",
     "https://tracker.gg/r6siege/*",
-    "https://stats.cc/*"
+    "https://stats.cc/*",
+    "https://api.stats.cc/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",

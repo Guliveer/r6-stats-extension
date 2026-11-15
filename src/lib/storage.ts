@@ -8,6 +8,10 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_PREFERENCES,
   MIN_REFRESH_MINUTES,
+  MAX_REFRESH_MINUTES,
+  MIN_LIST_HEIGHT,
+  MAX_LIST_HEIGHT,
+  DEFAULT_LIST_HEIGHT,
 } from './types';
 
 const KEY = 'r6_settings';
@@ -114,10 +118,14 @@ export async function savePreferences(partial: Partial<UserPreferences>): Promis
   };
   // Clamp at the storage layer so neither the popup nor a stale message can persist
   // out-of-range values that would cause Chrome to reject the alarm.
-  merged.pinnedAutoRefresh.intervalMinutes = Math.max(
-    MIN_REFRESH_MINUTES,
-    Math.round(merged.pinnedAutoRefresh.intervalMinutes),
+  merged.pinnedAutoRefresh.intervalMinutes = Math.min(
+    MAX_REFRESH_MINUTES,
+    Math.max(MIN_REFRESH_MINUTES, Math.round(merged.pinnedAutoRefresh.intervalMinutes)),
   );
+  const height = Number(merged.pinnedListHeight);
+  merged.pinnedListHeight = Number.isFinite(height)
+    ? Math.min(MAX_LIST_HEIGHT, Math.max(MIN_LIST_HEIGHT, Math.round(height)))
+    : DEFAULT_LIST_HEIGHT;
   await chrome.storage.local.set({ [PREFS_KEY]: merged });
   return merged;
 }

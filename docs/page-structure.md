@@ -94,7 +94,12 @@ user feedback.
 - **profile nav**: a `<nav>` whose anchors all match `/siege/{user}/{guid}/...`.
   - detection: `findProfileNav()` in src/content/statscc.ts.
   - inject-point: cloned tab → "Tracker.gg" link.
-- **player rank, RP, ranked K/D** — extracted from the Nuxt SSR payload (NOT from rendered DOM):
+- **player rank, RP, ranked K/D** — primary source is the JSON API, not the page:
+  `api.stats.cc/siege/v2/config` (live season slug) + `api.stats.cc/siege/v2/profiles/{guid}`
+  (`ranked_season_records`, `season_mode_records`). See [`statscc-api.md`](statscc-api.md)
+  for the endpoint reference and [`data-sources.md`](data-sources.md) for why.
+  `src/lib/statscc-api.ts` is the client; the Nuxt payload below is the fallback.
+- **fallback: Nuxt SSR payload** (NOT rendered DOM):
   - source: `<script id="__NUXT_DATA__" type="application/json">` — a flat
     Nuxt CompactSerializer array of indices. Also note: `siegeConfig` (with `currentSeason`)
     moves around the array between Nuxt builds (we've seen it at idx 4 and 1628), so

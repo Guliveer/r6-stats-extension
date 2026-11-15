@@ -1,5 +1,5 @@
 import type { UserSettings, PinnedPlayer, PinFailReason, Message, SelectProfileResponse, PinResponse, PlayerRank, RankedStats, UserPreferences } from '../lib/types';
-import { DEFAULT_PREFERENCES, MIN_REFRESH_MINUTES } from '../lib/types';
+import { DEFAULT_PREFERENCES, MIN_REFRESH_MINUTES, MAX_REFRESH_MINUTES, MIN_LIST_HEIGHT, MAX_LIST_HEIGHT } from '../lib/types';
 import { parseStatsccProfileUrl, parseTrackerProfileUrl } from '../lib/patterns';
 import { lookupRank } from '../lib/ranks';
 import { resolveIconSlug } from '../lib/statscc-rank';
@@ -397,7 +397,7 @@ function buildRankRow(rank: PlayerRank, stats?: RankedStats): HTMLElement {
 
   // Right side: K/D and RP. Both optional — render whichever we have.
   const right = document.createElement('span');
-  right.className = 'text-[0.6rem] text-gray-500 ml-auto shrink-0 font-mono flex items-center gap-1.5';
+  right.className = 'text-[0.6rem] text-gray-400 ml-auto shrink-0 font-mono flex items-center gap-1.5';
   let hasContent = false;
 
   if (stats?.kd != null) {
@@ -469,6 +469,7 @@ function createPinnedCard(player: PinnedPlayer, onRemove: () => void): HTMLEleme
   removeBtn.type = 'button';
   removeBtn.title = 'Unpin';
   removeBtn.textContent = '×';
+  removeBtn.setAttribute('aria-label', `Unpin ${player.username}`);
   removeBtn.className = 'w-6 h-6 flex items-center justify-center rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition text-base leading-none shrink-0';
   removeBtn.addEventListener('click', onRemove);
   card.appendChild(removeBtn);
@@ -561,6 +562,9 @@ function renderPinnedList(players: PinnedPlayer[]): void {
     });
     container.appendChild(card);
   }
+
+  // Cards exist now, so the height cap can be measured rather than estimated.
+  applyPinnedListHeight();
 }
 
 async function wirePinCurrent(): Promise<void> {
@@ -596,12 +600,35 @@ async function wirePinCurrent(): Promise<void> {
 
 // --- Settings modal ---
 
+// Cap the list to N visible rows. Card height depends on the rendered content (a card
+// without a rank row is shorter), so measure the tallest card instead of hard-coding it —
+// a fixed constant left a scrollbar showing even when exactly N cards fit.
+const PINNED_CARD_FALLBACK_PX = 60;
+const PINNED_CARD_GAP_PX = 6;
+
+function applyPinnedListHeight(): void {
+  const list = document.getElementById('pinned-list');
+  if (!list) return;
+  const rows = currentPreferences.pinnedListHeight ?? DEFAULT_PREFERENCES.pinnedListHeight;
+
+  const heights = Array.from(list.querySelectorAll<HTMLElement>('[data-player-key]'))
+    .map(card => card.getBoundingClientRect().height)
+    .filter(h => h > 0);
+  const cardHeight = heights.length ? Math.max(...heights) : PINNED_CARD_FALLBACK_PX;
+  const gap = parseFloat(getComputedStyle(list).rowGap) || PINNED_CARD_GAP_PX;
+
+  list.style.maxHeight = `${rows * cardHeight + (rows - 1) * gap}px`;
+}
+
 function applyPreferencesToUI(): void {
   for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="iconSet"]')) {
     radio.checked = radio.value === currentPreferences.iconSet;
   }
   (document.getElementById('prefs-autorefresh') as HTMLInputElement).checked = currentPreferences.pinnedAutoRefresh.enabled;
   (document.getElementById('prefs-interval') as HTMLInputElement).value = String(currentPreferences.pinnedAutoRefresh.intervalMinutes);
+  (document.getElementById('prefs-list-height') as HTMLInputElement).value =
+    String(currentPreferences.pinnedListHeight ?? DEFAULT_PREFERENCES.pinnedListHeight);
+  applyPinnedListHeight();
 }
 
 async function persistPreferences(partial: Partial<UserPreferences>): Promise<void> {
@@ -646,7 +673,10 @@ function wireSettingsModal(): void {
   // Persist on blur/Enter rather than every keystroke — number inputs fire 'input' for
   // partial values mid-typing, which would clamp users below their target.
   const commitInterval = (): void => {
-    const minutes = Math.max(MIN_REFRESH_MINUTES, Math.round(Number(interval.value) || MIN_REFRESH_MINUTES));
+    const minutes = Math.min(
+      MAX_REFRESH_MINUTES,
+      Math.max(MIN_REFRESH_MINUTES, Math.round(Number(interval.value) || MIN_REFRESH_MINUTES)),
+    );
     interval.value = String(minutes);
     persistPreferences({
       pinnedAutoRefresh: { ...currentPreferences.pinnedAutoRefresh, intervalMinutes: minutes },
@@ -654,6 +684,18 @@ function wireSettingsModal(): void {
   };
   interval.addEventListener('change', commitInterval);
   interval.addEventListener('blur', commitInterval);
+
+  const listHeight = document.getElementById('prefs-list-height') as HTMLInputElement;
+  const commitListHeight = (): void => {
+    const rows = Math.min(
+      MAX_LIST_HEIGHT,
+      Math.max(MIN_LIST_HEIGHT, Math.round(Number(listHeight.value) || DEFAULT_PREFERENCES.pinnedListHeight)),
+    );
+    listHeight.value = String(rows);
+    persistPreferences({ pinnedListHeight: rows });
+  };
+  listHeight.addEventListener('change', commitListHeight);
+  listHeight.addEventListener('blur', commitListHeight);
 }
 
 async function init(): Promise<void> {

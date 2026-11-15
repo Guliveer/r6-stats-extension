@@ -1,8 +1,10 @@
 import { BRAND, GUID_RE, parseStatsccMatchPath, parseStatsccProfilePath } from '../lib/patterns';
 import { appendClonedTab, findInactiveTab, watchAndSendAvatar } from './_shared';
 import { extractRankFromStatsccHtml } from '../lib/statscc-rank';
+import { fetchRankFromStatsccApi } from '../lib/statscc-api';
 import { startIconSwapObserver } from '../lib/icon-swap';
 import { DEFAULT_PREFERENCES } from '../lib/types';
+import type { PlayerRank, RankedStats } from '../lib/types';
 
 const NAV_OBSERVER_DEBOUNCE_MS = 150;
 const PROFILE_NAV_GUID_RE = new RegExp(`/siege/[^/]+/${GUID_RE.source}`, 'i');
@@ -259,34 +261,46 @@ function extractRankFromDom(): { tier: string; division?: string; mmr?: number; 
   };
 }
 
-function extractAndSendRank(): void {
+// `fetchedAt` is stamped here, so callers pass rank data without it.
+function sendRank(
+  guid: string,
+  rank: Omit<PlayerRank, 'fetchedAt'> & { fetchedAt?: number },
+  rankedStats?: RankedStats,
+): void {
+  chrome.runtime.sendMessage({
+    type: 'SET_PLAYER_RANK',
+    payload: { guid, rank: { ...rank, fetchedAt: Date.now() }, rankedStats },
+  });
+}
+
+async function extractAndSendRank(): Promise<void> {
   const profile = parseStatsccProfilePath(location.pathname);
   if (!profile) return;
+  const requestedPath = location.pathname;
 
+  // Primary path: stats.cc's own public JSON API — no key, and the live season comes from
+  // its /config endpoint instead of guessing from the Nuxt payload.
+  const viaApi = await fetchRankFromStatsccApi(profile.guid);
+  if (viaApi) {
+    // The user may have navigated to another profile while the request was in flight.
+    if (location.pathname === requestedPath) sendRank(profile.guid, viaApi.rank, viaApi.rankedStats);
+    return;
+  }
+
+  // Fallback: stats.cc embeds the SSR Nuxt payload in <script id="__NUXT_DATA__">.
+  // Parsing it gives us the player's profile object deterministically — current-season
+  // rank, RP, and ranked K/D, no regex over rendered text.
   const start = Date.now();
   const tryOnce = (): boolean => {
-    // Primary path: stats.cc embeds the SSR Nuxt payload in <script id="__NUXT_DATA__">.
-    // Parsing it gives us the player's profile object deterministically — current-season
-    // rank, RP, and ranked K/D, no regex over rendered text.
     const data = extractRankFromStatsccHtml(document.documentElement.outerHTML, profile.guid);
     if (data) {
-      chrome.runtime.sendMessage({
-        type: 'SET_PLAYER_RANK',
-        payload: {
-          guid: profile.guid,
-          rank: { ...data.rank, fetchedAt: Date.now() },
-          rankedStats: data.rankedStats,
-        },
-      });
+      sendRank(profile.guid, data.rank, data.rankedStats);
       return true;
     }
-    // Fallback: regex over rendered text (only triggers if SSR script is missing).
+    // Last resort: regex over rendered text (only triggers if SSR script is missing).
     const rank = extractRankFromDom();
     if (!rank) return false;
-    chrome.runtime.sendMessage({
-      type: 'SET_PLAYER_RANK',
-      payload: { guid: profile.guid, rank: { ...rank, fetchedAt: Date.now() } },
-    });
+    sendRank(profile.guid, rank);
     return true;
   };
 
@@ -296,8 +310,9 @@ function extractAndSendRank(): void {
   }, RANK_POLL_MS);
 }
 
-// Synchronous rank extraction for callers (e.g. service-worker pinning the current tab)
-// who need the data right now and have decided this tab is on a stats.cc profile.
+// Rank extraction on demand for callers (e.g. service-worker pinning the current tab)
+// who have already decided this tab is on a stats.cc profile. Same order as the proactive
+// path: API first, then the page's own SSR payload.
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'EXTRACT_RANK_FROM_PAGE') return false;
 
@@ -307,16 +322,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
-  const data = extractRankFromStatsccHtml(document.documentElement.outerHTML, profile.guid);
-  if (!data) {
-    sendResponse(null);
-    return false;
-  }
-  sendResponse({
-    rank: { ...data.rank, fetchedAt: Date.now() },
-    rankedStats: data.rankedStats,
-  });
-  return false;
+  void (async () => {
+    const viaApi = await fetchRankFromStatsccApi(profile.guid);
+    if (viaApi) {
+      sendResponse(viaApi);
+      return;
+    }
+
+    const data = extractRankFromStatsccHtml(document.documentElement.outerHTML, profile.guid);
+    if (!data) {
+      sendResponse(null);
+      return;
+    }
+    sendResponse({
+      rank: { ...data.rank, fetchedAt: Date.now() },
+      rankedStats: data.rankedStats,
+    });
+  })();
+
+  return true;
 });
 
 function init(): void {

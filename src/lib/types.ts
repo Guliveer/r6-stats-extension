@@ -25,10 +25,17 @@ export interface UserPreferences {
     enabled: boolean;
     intervalMinutes: number;
   };
+  // How many pinned cards fit before the list scrolls.
+  pinnedListHeight: number;
 }
 
 export const MIN_REFRESH_MINUTES = 30;
+export const MAX_REFRESH_MINUTES = 1440;
 export const DEFAULT_REFRESH_MINUTES = 180;
+
+export const MIN_LIST_HEIGHT = 1;
+export const MAX_LIST_HEIGHT = 10;
+export const DEFAULT_LIST_HEIGHT = 3;
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
   iconSet: 'auto',
@@ -36,6 +43,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
     enabled: true,
     intervalMinutes: DEFAULT_REFRESH_MINUTES,
   },
+  pinnedListHeight: DEFAULT_LIST_HEIGHT,
 };
 
 export interface UserSettings {

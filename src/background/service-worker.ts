@@ -2,6 +2,7 @@ import type { Message, SelectProfileResponse, PinResponse, ExtractedProfile, Pin
 import { parseStatsccProfileUrl, parseTrackerProfileUrl, GUID_RE } from '../lib/patterns';
 import { getSettings, saveSettings, getPinnedPlayers, addPinnedPlayer, removePinnedPlayer, reorderPinnedPlayers, setPinnedPlayerRank, getPreferences, savePreferences } from '../lib/storage';
 import { extractRankFromStatsccHtml } from '../lib/statscc-rank';
+import { fetchRankFromStatsccApi } from '../lib/statscc-api';
 
 const FULL_GUID_RE = new RegExp(`^${GUID_RE.source}$`, 'i');
 
@@ -148,6 +149,11 @@ async function refreshAllPinnedRanks(): Promise<void> {
 }
 
 async function fetchRankFromStatscc(guid: string): Promise<{ rank: PlayerRank; rankedStats?: RankedStats } | null> {
+  // Primary: stats.cc's own JSON API. Fallback (below): parse the SSR payload out of the
+  // rendered page, which needs no second request and no extra parsing agreement.
+  const viaApi = await fetchRankFromStatsccApi(guid);
+  if (viaApi) return viaApi;
+
   try {
     // stats.cc requires the GUID. Username omitted — GUID-only URL is canonical.
     const url = `https://stats.cc/siege/${guid}`;
